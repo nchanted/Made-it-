@@ -58,9 +58,13 @@ Then find it under the repo's **Releases**.
 - **Create your character** — choose skin tone, hair style and colour, glasses
   and facial hair (or hit "Surprise me"). Your avatar appears in every office
   scene and its outfit upgrades as you climb.
-- **Each week = one decision.** The category of decision depends on your level:
-  technical problems early on, then people management, then budgets, then
-  executive/board-level dilemmas.
+- **Each week = one decision, tailored to your job.** A SOC analyst triages
+  alerts, contains ransomware and hunts threats; a pen tester scopes engagements,
+  handles out-of-scope discoveries and writes findings; a security engineer
+  fixes leaked secrets, hardens build pipelines and designs segmentation. As you
+  rise you move from hands-on technical work to people management, then budgets,
+  then executive and board-level dilemmas. Many scenarios draw on real incidents
+  and attacker techniques.
 - **Meters:** Performance and Stress, plus four skills — Technical, Leadership,
   Business, Comms. The ★ marks the skill that matters most in your current role.
 - **Read the situation.** Every option is selectable, and the game never tells
@@ -111,17 +115,23 @@ Almost all content lives in **`app/src/main/assets/js/data.js`** and is plain
 data — add to the arrays and it's picked up automatically.
 
 **Add a scenario** — append an object to `SCENARIOS`. `cats` controls which
-career stage it appears in (`technical`, `people`, `budget`, `executive`):
+career stage it appears in (`technical`, `people`, `budget`, `executive`).
+Technical scenarios also take a `track` (`blue` = SOC/defence, `red` = offensive,
+`build` = engineering, or `any` = cross-cutting) and a `tier` (`1` entry, `2` mid,
+`3` senior, `4` architect/principal), so they only reach the right role at the
+right level:
 ```js
-{ id:'t_newthing', cats:['technical'], type:'Incident', title:'Your title',
-  text:'The situation the player faces…',
+{ id:'bl_newthing', cats:['technical'], track:'blue', tier:2, type:'Incident',
+  title:'Your title', text:'The situation the player faces…',
   choices:[
-    { t:'A strong, skill-gated option', req:{technical:40},
-      fx:{perf:8, technical:5, stress:3}, res:'What happens if they pick it.' },
-    { t:'A mediocre option', fx:{perf:-3}, res:'…' },
-    { t:'A bad option',      fx:{perf:-9, stress:4}, res:'…' }
+    { t:'A bold, expertise-dependent option', req:{technical:42},
+      fx:{perf:8, technical:5, stress:3}, res:'What happens if they pull it off.',
+      failRes:'What happens if they attempt it without the skill.' },
+    { t:'A solid pragmatic option', fx:{perf:4, technical:2}, res:'…' },
+    { t:'A poor option', fx:{perf:-9, stress:4}, res:'…' }
   ]},
 ```
+(`people`/`budget`/`executive` scenarios omit `track`/`tier`.)
 `fx` keys: `perf`, `technical`, `leadership`, `business`, `communication`,
 `stress`, and `money` (in dollars). Positive `perf` is good; positive `stress`
 is bad. `req` marks an option as needing expertise: if the player meets it, they

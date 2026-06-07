@@ -103,18 +103,38 @@
       return r ? r.cat : 'technical';
     },
 
+    TIER_BY_BAND: { entry:1, mid:2, senior:3, architect:4, principal:4 },
+
+    // The eligible scenario pool for the current rank. Technical roles are
+    // scoped by the player's track (blue/red/build) and seniority tier so a
+    // SOC analyst, a pen tester and a security engineer get different work;
+    // management roles draw from their category (people/budget/executive).
+    poolFor: function () {
+      var st = this.state, cat = this.category();
+      var all = SCENARIOS.filter(function (s) { return s.cats.indexOf(cat) !== -1; });
+      if (cat !== 'technical') return all;
+      var tier = this.TIER_BY_BAND[RANKS[st.rank].band] || 2;
+      var track = st.track || 'build';
+      function f(pred) { return all.filter(pred); }
+      var p = f(function (s) { var t = s.tier || 2; return (s.track === 'any' || s.track === track) && t >= tier - 1 && t <= tier; });
+      if (p.length >= 4) return p;
+      p = f(function (s) { return s.track === 'any' || s.track === track; });   // relax tier
+      if (p.length >= 4) return p;
+      return all;                                                               // last resort
+    },
+
     drawScenario: function () {
       var st = this.state, cat = this.category();
       if (!st.seen[cat]) st.seen[cat] = [];
-      var inCat = SCENARIOS.filter(function (s) { return s.cats.indexOf(cat) !== -1; });
-      var pool = inCat.filter(function (s) { return st.seen[cat].indexOf(s.id) === -1; });
+      var base = this.poolFor();
+      var pool = base.filter(function (s) { return st.seen[cat].indexOf(s.id) === -1; });
       if (!pool.length) {
         // Pool exhausted. Reshuffle, but keep the most recently seen ones out of
         // rotation so nothing reappears soon after it was shown.
-        var keep = Math.min(st.seen[cat].length, Math.max(3, Math.floor(inCat.length / 3)));
+        var keep = Math.min(st.seen[cat].length, Math.max(3, Math.floor(base.length / 3)));
         st.seen[cat] = st.seen[cat].slice(-keep);
-        pool = inCat.filter(function (s) { return st.seen[cat].indexOf(s.id) === -1; });
-        if (!pool.length) { st.seen[cat] = st.current ? [st.current] : []; pool = inCat.filter(function (s) { return s.id !== st.current; }); }
+        pool = base.filter(function (s) { return st.seen[cat].indexOf(s.id) === -1; });
+        if (!pool.length) { st.seen[cat] = st.current ? [st.current] : []; pool = base.filter(function (s) { return s.id !== st.current; }); }
       }
       var s = pick(pool);
       st.current = s.id;

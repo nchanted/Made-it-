@@ -127,117 +127,260 @@ function sceneForBand(band){
 const SCENARIOS = [
 
 /* ---------------- TECHNICAL ---------------- */
-{ id:'t_phish', cats:['technical'], type:'Incident', title:'The boss clicked a bad link',
-  text:'Your finance chief forwards a polished email that looked like a document to sign, then admits they typed their company password into the page it linked to. That password may now be in a stranger\u2019s hands \u2014 and they could already be reading email or trying to move money.',
+/* track: 'blue' (SOC/defence), 'red' (offensive), 'build' (engineering), 'any' (cross-cutting)
+   tier: 1 entry, 2 mid, 3 senior, 4 architect/principal */
+
+/* --- BLUE TEAM: detection & response --- */
+{ id:'bl_phish', cats:['technical'], track:'blue', tier:1, type:'Alert', title:'A flood of look-alike login emails',
+  text:'Staff are reporting emails that look exactly like your company\u2019s login page, asking them to \u201Creconfirm\u201D their password. A few admit they already entered it. This is a classic phishing wave \u2014 attackers harvesting passwords to walk straight in the front door.',
   choices:[
-    { t:'Reset the password and forcibly log out every active session right now, then check what was touched.', req:{technical:30}, fx:{perf:9, technical:5, stress:3}, res:'You kill the stolen login within minutes and confirm nothing was sent. Stop the bleeding first \u2014 textbook.', failRes:'You fumble the session cleanup, miss one active login, and the intruder quietly sets up mail-forwarding before you catch it.' },
-    { t:'Reset the password and switch on a second login step for that account.', fx:{perf:4, technical:2, stress:1}, res:'A clean, solid response. The account is locked down and a second factor now blocks the stolen password.' },
-    { t:'Log a ticket and send the chief some tips on spotting fake emails.', fx:{perf:-9, stress:-1}, res:'By the time anyone reads the ticket, finance threads are being forwarded to a stranger\u2019s inbox. Far too slow.' }
+    { t:'Pull the malicious sender from everyone\u2019s inboxes, force a password reset for anyone who clicked, and block the fake site.', req:{technical:30}, fx:{perf:9, technical:5, stress:3}, res:'You contain the wave at the source and shut the door before the harvested passwords get used. Fast and complete.', failRes:'You reset the obvious victims but miss the inbox-wide cleanup; new clicks keep rolling in for another day.' },
+    { t:'Reset passwords for the handful who admit they clicked and warn the company.', fx:{perf:4, technical:2, communication:2, stress:1}, res:'You catch the known victims and raise awareness. Solid, though some quieter clickers may slip through.' },
+    { t:'Send a company-wide \u201Cdon\u2019t click suspicious links\u201D reminder and move on.', fx:{perf:-8, stress:-1}, res:'A reminder doesn\u2019t un-steal the passwords already typed in. Attackers log in that night.' }
   ]},
-{ id:'t_patch', cats:['technical'], type:'Vulnerability', title:'Severe flaw, Friday at 5pm',
-  text:'A serious flaw \u2014 rated 9.8 out of 10 \u2014 is announced in the network gear that routes traffic to all your public websites. A fix exists, but installing it means a short planned outage, and attackers usually start probing flaws like this within hours.',
+{ id:'bl_triage', cats:['technical'], track:'blue', tier:1, type:'Triage', title:'400 alerts, one of them real',
+  text:'Your monitoring dashboard logged 400 alerts overnight, almost all false alarms from one noisy rule. Somewhere in that haystack there may be one real needle, and your shift is judged on what you miss.',
   choices:[
-    { t:'Put a temporary shield rule in front of it tonight to block the attack, then schedule the real fix with sign-off.', req:{technical:40}, fx:{perf:8, technical:5, stress:2}, res:'You blunt the exploit with no outage and still fix it properly through change control. Elegant.', failRes:'Your stop-gap rule is misconfigured \u2014 it blocks real customers for an hour while leaving the actual hole open. Embarrassing.' },
-    { t:'Take the short outage now and install the proper fix immediately.', fx:{perf:6, technical:3, stress:6}, res:'Twenty noisy minutes of downtime and some grumbling from operations \u2014 but you\u2019re safe before the weekend wave of attacks.' },
-    { t:'Wait for the normal monthly maintenance window.', fx:{perf:-11, stress:2}, res:'It\u2019s scanned and exploited Saturday night. You spend Sunday in a crisis room instead of a maintenance window.' }
+    { t:'Tune the noisy rule to kill the false alarms, then investigate the handful that remain.', req:{technical:28}, fx:{perf:8, technical:6, stress:-2}, res:'The queue drops to 14 real items \u2014 one is an attacker testing stolen credentials. The needle was hiding in the noise.', failRes:'Your rule change is too broad and silences a real detection alongside the noise. The gap shows up later.' },
+    { t:'Work the whole queue by hand so nothing is missed.', fx:{perf:3, technical:2, stress:7}, res:'Nothing slips past you, but it devours your shift and clearly won\u2019t scale to tomorrow\u2019s 400.' },
+    { t:'Mark them all \u201Clikely false positive\u201D to clear the board.', fx:{perf:-9, stress:-2}, res:'You also dismissed the one that mattered. Bulk-closing alerts is how real intrusions go unnoticed for months.' }
   ]},
-{ id:'t_alert', cats:['technical'], type:'Triage', title:'Drowning in false alarms',
-  text:'Your monitoring tools logged 400 warnings overnight, and almost all are false alarms from one badly-tuned rule. Somewhere in that noise there might be a real attack, and leadership wants to know there isn\u2019t.',
+{ id:'bl_signin', cats:['technical'], track:'blue', tier:1, type:'Investigation', title:'Logged in from two countries at once',
+  text:'An employee\u2019s account just signed in from your city and, eight minutes later, from a data centre overseas. Nobody teleports \u2014 this \u201Cimpossible travel\u201D usually means an attacker is using a stolen password (ATT&CK calls it \u201CValid Accounts\u201D).',
   choices:[
-    { t:'Fix the noisy rule first to clear the false alarms, then investigate whatever\u2019s actually left.', req:{technical:30}, fx:{perf:8, technical:6, stress:-2}, res:'The queue collapses to 16 real items \u2014 one of which is a genuine attempt to burrow deeper into the network. Great catch.', failRes:'You tweak the rule wrong and accidentally silence a whole category of real alerts too. The gap surfaces later.' },
-    { t:'Work through the queue by hand, flagging anything suspicious.', fx:{perf:3, technical:2, stress:7}, res:'You get through it and miss nothing, but it eats your whole week and clearly doesn\u2019t scale.' },
-    { t:'Switch the noisy rule off completely and move on.', fx:{perf:-7, stress:-3}, res:'You also switched off the one detection that mattered. The miss shows up two weeks later. Ouch.' }
+    { t:'Suspend the session, reset the account, and check what the foreign login already accessed.', req:{technical:30}, fx:{perf:8, technical:6, stress:3}, res:'You lock it down and confirm the intruder only had minutes \u2014 not enough to do damage. Quick instincts win.', failRes:'You reset the password but don\u2019t review the activity, missing the mail rule the attacker quietly set up first.' },
+    { t:'Call the employee to confirm it wasn\u2019t them, then reset if not.', fx:{perf:5, communication:2, technical:2, stress:2}, res:'A quick phone call confirms it\u2019s an intruder and you act. A few minutes slower, but no false alarm either.' },
+    { t:'Assume they\u2019re travelling with a VPN and close the alert.', fx:{perf:-9, stress:1}, res:'It wasn\u2019t a VPN. By morning the attacker has read months of email. Assumptions are how footholds become breaches.' }
   ]},
-{ id:'t_creds', cats:['technical'], type:'Investigation', title:'Master passwords left in public',
-  text:'Reviewing some code, you spot a set of cloud account keys \u2014 essentially master passwords for company servers \u2014 accidentally published in a code repository anyone on the internet can read. They\u2019ve sat there for three weeks.',
+{ id:'bl_ransom', cats:['technical'], track:'blue', tier:2, type:'Incident', title:'Files are locking up across a server',
+  text:'Files on a shared server are being scrambled in real time and a ransom note just appeared \u2014 ransomware, the same play that shut down Colonial Pipeline. It\u2019s spreading machine to machine and every second counts.',
   choices:[
-    { t:'Cancel the keys, comb the cloud activity logs for misuse, then fix the code and add a guard against recurrence.', req:{technical:35}, fx:{perf:9, technical:6, stress:4}, res:'Cancelling first saves you: the logs show only a harmless bot scan. You add an automatic check so it can\u2019t happen again.', failRes:'You cancel the wrong key set first and briefly break a live service while the exposed keys stay active. Rough.' },
-    { t:'Cancel and reissue the keys right away.', fx:{perf:5, technical:2, stress:2}, res:'The exposed keys are dead. You didn\u2019t dig into the logs, but the immediate danger is gone.' },
-    { t:'Just delete the file from the repository.', fx:{perf:-8, technical:-1}, res:'The keys live on forever in the repository\u2019s history and were likely copied long ago. Deleting isn\u2019t cancelling.' }
+    { t:'Isolate the infected machines from the network now, identify the spread method, and preserve evidence.', req:{technical:42}, fx:{perf:9, technical:7, stress:6}, res:'You sever the spread within minutes \u2014 a dozen machines hit instead of the whole site \u2014 and keep the forensics intact.', failRes:'You isolate the wrong segment first; the encryption jumps to a backup server before you contain it. Costly minutes lost.' },
+    { t:'Disconnect the obviously-infected server and call in senior responders.', fx:{perf:5, technical:3, communication:2, stress:5}, res:'You stop the most visible spread and escalate. Help arrives to finish containment \u2014 measured and safe.' },
+    { t:'Start restoring from backup while it\u2019s still spreading.', fx:{perf:-10, stress:6}, res:'Restoring into a live infection just re-encrypts your clean data. Contain first, restore second \u2014 always.' }
   ]},
-{ id:'t_oncall', cats:['technical'], type:'On-call', title:'A 3 a.m. phone call',
-  text:'Your phone wakes you at 3 a.m.: a shared company file server may be infected with ransomware \u2014 software that locks up files and demands payment. Every minute it spreads to more machines. You\u2019re half asleep.',
+{ id:'bl_c2', cats:['technical'], track:'blue', tier:2, type:'Detection', title:'A laptop is phoning home on a schedule',
+  text:'One laptop is quietly contacting the same unfamiliar server every 60 seconds, around the clock. That regular \u201Cheartbeat\u201D is the signature of attacker remote-control software (like Cobalt Strike) waiting for orders \u2014 ATT&CK calls it Command and Control.',
   choices:[
-    { t:'Disconnect the infected server from the network immediately, then investigate.', req:{technical:25}, fx:{perf:8, technical:5, stress:5}, res:'You cut it off before the lock-up spreads. Three machines hit instead of three hundred. Hero.', failRes:'Groggy, you pull the wrong machine offline first; the infection jumps to two more servers before you contain it.' },
-    { t:'Call in the on-call senior engineer and start a response bridge while you watch it.', fx:{perf:3, communication:2, stress:4}, res:'Backup arrives in 15 minutes and you contain it together. Slower than ideal, but no heroics gone wrong.' },
-    { t:'Let it run and deal with it properly in the morning.', fx:{perf:-12, stress:2}, res:'Morning-you inherits a far bigger fire. Some calls can\u2019t wait for coffee.' }
+    { t:'Quietly isolate the host, capture the malware for analysis, and hunt for the same beacon elsewhere.', req:{technical:42}, fx:{perf:9, technical:7, stress:4}, res:'You bag the implant and find it on two more machines \u2014 catching the whole foothold instead of one symptom.', failRes:'You move loudly and tip off the attacker, who burns the access and digs in deeper before you finish. Harder now.' },
+    { t:'Block the suspicious server at the firewall and reimage the laptop.', fx:{perf:5, technical:3, stress:2}, res:'You cut the attacker\u2019s line and clean the machine. The immediate threat is gone, even if you didn\u2019t scope the full picture.' },
+    { t:'Add the address to a watchlist and keep monitoring.', fx:{perf:-8, stress:2}, res:'\u201CWatching\u201D an active backdoor just gives the attacker more time. They escalate while you take notes.' }
   ]},
-{ id:'t_report', cats:['technical'], type:'Reporting', title:'The report nobody will read',
-  text:'You found a serious flaw that would let an attacker read your customer database. Your draft write-up is 40 pages of raw tool output that no executive will ever actually read.',
+{ id:'bl_log4shell', cats:['technical'], track:'blue', tier:2, type:'Crisis', title:'A flaw in software you all use, exploited now',
+  text:'The whole industry is scrambling: a critical flaw in a widely-used software component (think Log4Shell) is being mass-exploited tonight, and it\u2019s buried inside dozens of your applications. There\u2019s no clean fix yet.',
   choices:[
-    { t:'Rewrite it: one plain-English page on the risk and the fix up front, with the technical proof behind it.', req:{communication:30}, fx:{perf:8, communication:6, technical:2}, res:'Leadership actually reads it and funds the fix the same week. A finding nobody acts on is just trivia.', failRes:'You over-simplify and strip out too much; executives are confused, ask for a redo, and the fix slips a month.' },
-    { t:'Add a short summary at the top and send the full report.', fx:{perf:4, communication:2}, res:'The summary helps; the right people skim it and a fix gets scheduled, if not rushed.' },
-    { t:'Send the raw 40 pages \u2014 the data speaks for itself.', fx:{perf:-5, stress:-1}, res:'The data mumbles. The team skims, shrugs, and the flaw ships to customers anyway.' }
+    { t:'Deploy detection for the exploit and actively hunt for successful attempts while engineering mitigates.', req:{technical:45}, fx:{perf:9, technical:7, stress:6}, res:'You spot two exploit attempts and confirm neither landed \u2014 turning blind panic into a controlled, evidenced response.', failRes:'Your detection is rushed and full of gaps; you can\u2019t actually tell whether you were hit, and the uncertainty haunts the review.' },
+    { t:'Apply the recommended temporary mitigations to the internet-facing apps first.', fx:{perf:6, technical:4, stress:4}, res:'You shrink the exposure where it matters most while a full fix is prepared. Pragmatic triage under fire.' },
+    { t:'Wait for vendors to ship patched versions.', fx:{perf:-9, stress:3}, res:'Waiting during mass exploitation is a gamble you lose. The scanners find your exposed apps before the patch does.' }
   ]},
-{ id:'t_zero', cats:['technical'], type:'Threat Intel', title:'A brand-new flaw, already being used',
-  text:'Security circles are buzzing: attackers are right now exploiting a freshly-discovered flaw in software you definitely run, and there\u2019s no official fix yet. The clock is ticking.',
+{ id:'bl_hunt', cats:['technical'], track:'blue', tier:3, type:'Threat Hunt', title:'Quiet network, nagging feeling',
+  text:'No alarms are firing, but a peer org in your industry was just breached by a stealthy group that lives off the land (using normal admin tools so nothing looks malicious). Your gut says: assume they\u2019re here too and go looking.',
   choices:[
-    { t:'Assume you might already be hit and hunt across every system for signs of intrusion now.', req:{technical:45}, fx:{perf:9, technical:7, stress:5}, res:'You hunt hard and find nothing \u2014 and can now prove it. That confidence is worth its weight in gold.', failRes:'Your hunt is sloppy and inconclusive; you raise an alarm you can\u2019t back up and burn a day chasing ghosts.' },
-    { t:'Apply the vendor\u2019s recommended temporary workaround and document it.', fx:{perf:6, technical:3, stress:2}, res:'A measured response: you cut your exposure and keep a clean record for the review afterward.' },
-    { t:'Wait for the official patch to arrive.', fx:{perf:-8, stress:1}, res:'\u201CWait\u201D isn\u2019t a plan during an active attack. Leadership asks pointed questions later.' }
+    { t:'Run a hypothesis-driven hunt based on that group\u2019s known techniques across your logs and endpoints.', req:{technical:52}, fx:{perf:9, technical:7, communication:2, stress:4}, res:'Your hunt surfaces a dormant foothold no alert would ever have caught. Proactive hunting is what separates good from great.', failRes:'Your hunt is unfocused \u2014 you trawl everything, find nothing conclusive, and burn a week you can\u2019t fully justify.' },
+    { t:'Add detections for that group\u2019s known indicators and watch closely.', fx:{perf:5, technical:3, stress:2}, res:'You tune your sensors to the threat and stay alert. Reactive, but a sensible use of the warning.' },
+    { t:'No alerts means no problem \u2014 stay focused on the queue.', fx:{perf:-6, technical:-1, stress:1}, res:'The stealthiest attackers never trip an alert by design. \u201CNo news\u201D was exactly what they were counting on.' }
   ]},
-{ id:'t_automate', cats:['technical'], type:'Engineering', title:'Death by busywork',
-  text:'Your team burns about 10 hours every week manually gathering the same evidence to prove the company follows its own security rules. It\u2019s mind-numbing and easy to get wrong.',
+{ id:'bl_exfil', cats:['technical'], track:'blue', tier:3, type:'Insider', title:'A trusted account is hoarding data',
+  text:'A long-tenured employee\u2019s account is suddenly downloading huge volumes of customer records and copying them to personal cloud storage \u2014 late at night. It could be data theft on the way out the door, or it could be innocent. Get it wrong and you either miss a breach or falsely accuse a colleague.',
   choices:[
-    { t:'Spend a week building a tool to collect it automatically, forever.', req:{technical:40}, fx:{perf:8, technical:6, business:3, stress:-3}, res:'One week of work reclaims hundreds of hours a year. Soon everyone\u2019s bringing you their tedious chores to automate.', failRes:'The automation is half-baked and spits out wrong numbers an auditor later questions; you scramble to rebuild trust in it.' },
-    { t:'Build a simple checklist and template to make the manual work faster.', fx:{perf:4, technical:2, stress:-1}, res:'Not glamorous, but the task gets a little quicker and less error-prone each week.' },
-    { t:'Hand the whole chore to the newest hire.', fx:{perf:-4, leadership:-2, stress:-2}, res:'You solved your problem by creating theirs. Morale dips, and so does your standing.' }
+    { t:'Quietly preserve the evidence, loop in HR and legal, and build the picture before anyone is confronted.', req:{technical:50}, fx:{perf:9, technical:6, communication:3, stress:4}, res:'You handle a delicate insider case by the book \u2014 evidence first, accusations never \u2014 and it holds up when it matters.', failRes:'You jump to conclusions and confront them directly; if you\u2019re wrong it\u2019s a disaster, and even if right you\u2019ve tainted the evidence.' },
+    { t:'Restrict the account\u2019s access to stop further downloads and flag it to your manager.', fx:{perf:5, technical:3, stress:2}, res:'You stop the bleeding and escalate appropriately. You may have tipped them off, but the data stops moving.' },
+    { t:'Confront the employee directly to ask what they\u2019re doing.', fx:{perf:-7, communication:-2, stress:3}, res:'You tipped your hand and trampled the evidence. Insider cases are won with patience and process, not ambushes.' }
   ]},
-{ id:'t_segment', cats:['technical'], type:'Architecture', title:'The network is wide open inside',
-  text:'You realize that inside the company, everything is reachable from everything else \u2014 so if an attacker breaks into any one laptop, they can reach the crown-jewel systems too. Walling it off properly would be a massive project.',
+{ id:'bl_tabletop', cats:['technical'], track:'blue', tier:3, type:'Preparedness', title:'Nobody knows who does what in a crisis',
+  text:'Your last small incident was chaos \u2014 people tripping over each other, no clear decision-maker. A major one would be a catastrophe. You could run a tabletop exercise: a realistic walk-through where the team rehearses a breach before a real one tests them.',
   choices:[
-    { t:'Propose doing it in phases, protecting the most critical systems first.', req:{technical:55}, fx:{perf:9, technical:6, business:4, stress:3}, res:'Phasing turns a terrifying project into a fundable one. Leadership loves \u201Cbiggest risk first.\u201D', failRes:'You underestimate the complexity; the first phase drags, breaks a key app, and sours everyone on the whole idea.' },
-    { t:'Start small: wall off just the crown-jewel systems behind tighter controls.', fx:{perf:5, technical:3, stress:2}, res:'A modest but real improvement. The most important systems are now harder to reach, even if the rest waits.' },
-    { t:'Note it in the risk log and move on.', fx:{perf:-2, business:1}, res:'Writing down a risk isn\u2019t reducing it. The auditor will enjoy finding your own note about the gap.' }
+    { t:'Design and run a realistic tabletop based on a likely attack, then turn the gaps it exposes into a fixed plan.', req:{technical:48}, fx:{perf:8, technical:5, leadership:3, communication:3, stress:-2}, res:'The exercise surfaces a dozen gaps in a safe setting. When the real thing hits months later, the team moves like clockwork.', failRes:'Your scenario is unrealistic and the session drifts; people leave unconvinced and the gaps stay hidden until a real crisis.' },
+    { t:'Write a one-page incident checklist and circulate it.', fx:{perf:5, communication:3, technical:1}, res:'A clear checklist beats nothing and gives people a spine to follow under pressure. A solid first step.' },
+    { t:'Assume the team will rise to the occasion when it counts.', fx:{perf:-6, leadership:-2, stress:2}, res:'Teams don\u2019t rise to the occasion; they fall to their level of preparation. The next incident proves it.' }
   ]},
-{ id:'t_falsepos', cats:['technical'], type:'Detection', title:'The CEO\u2019s favorite app keeps getting blocked',
-  text:'A new protective tool keeps blocking a piece of software the CEO personally loves and uses daily. The CEO is\u2026 very vocal about wanting it to stop.',
+
+/* --- RED TEAM: offensive / pen testing --- */
+{ id:'rd_scope', cats:['technical'], track:'red', tier:1, type:'Engagement', title:'The client wants you to \u201Cjust test everything\u201D',
+  text:'You\u2019re kicking off a penetration test \u2014 an authorized, simulated attack to find weaknesses before real attackers do. The client waves a hand and says \u201Cjust hack whatever you can.\u201D But with no written scope, you could break the law or take down their live shop.',
   choices:[
-    { t:'Check whether the app is actually safe, confirm it, then carefully allow it with extra monitoring.', req:{technical:35}, fx:{perf:7, technical:4, communication:3}, res:'You don\u2019t just cave \u2014 you verify, then allow it safely. The CEO feels heard and you keep your standards.', failRes:'You rush the exception without really checking, and the \u201Csafe\u201D app turns out to carry real risk. Now you own that.' },
-    { t:'Add a narrow, temporary exception just for the CEO\u2019s machine while you look into it.', fx:{perf:4, communication:2, stress:1}, res:'A reasonable stopgap that buys goodwill and time without opening the floodgates.' },
-    { t:'Switch the protective rule off for everyone to stop the complaints.', fx:{perf:-7, technical:-2}, res:'You disabled a company-wide protection to please one person. That rule existed for a reason.' }
+    { t:'Insist on written rules of engagement: what\u2019s in scope, what\u2019s off-limits, and an emergency contact.', req:{technical:28}, fx:{perf:8, technical:5, communication:3}, res:'A clear scope protects the client, protects you legally, and makes the whole test cleaner. Professionals never skip this.', failRes:'You draft a vague scope to seem easy-going; mid-test you hit a grey area nobody agreed on and the trust evaporates.' },
+    { t:'Agree verbally and stick to obviously-safe targets.', fx:{perf:4, technical:2, communication:1, stress:1}, res:'You proceed carefully and avoid disaster, but a handshake scope leaves you exposed if anything goes sideways.' },
+    { t:'Take them at their word and start hammering everything.', fx:{perf:-9, communication:-2, stress:2}, res:'You knock their live checkout offline and brush against systems they don\u2019t even own. \u201CThey said anything\u201D is not a legal defence.' }
   ]},
-{ id:'t_logs', cats:['technical'], type:'Investigation', title:'No record of what happened',
-  text:'A manager is sure an ex-employee copied files on their way out and wants proof. You go looking \u2014 and find that the system meant to record who-did-what was never switched on for that server.',
+{ id:'rd_webapp', cats:['technical'], track:'red', tier:1, type:'Web App', title:'You can read other users\u2019 orders',
+  text:'Testing the client\u2019s web shop, you change a number in the address bar and suddenly you\u2019re looking at another customer\u2019s order and home address. It\u2019s a textbook access-control flaw (ATT&CK-style: abusing trusted access). How you prove and report it matters.',
   choices:[
-    { t:'Reconstruct events from other sources \u2014 backups, network records, email \u2014 to piece together a timeline.', req:{technical:45}, fx:{perf:8, technical:6, stress:4}, res:'Detective work pays off: you assemble a credible picture from the breadcrumbs and answer the question.', failRes:'You over-claim from thin evidence; when challenged, your reconstruction falls apart and you have to walk it back.' },
-    { t:'Be honest about the gap and switch on proper logging everywhere now.', fx:{perf:5, technical:3, communication:2, stress:1}, res:'You can\u2019t fully answer this one, but you make sure you\u2019re never caught blind again. Leadership respects the candor.' },
-    { t:'Tell them what they want to hear and guess at the details.', fx:{perf:-9, communication:-2}, res:'Your guesses fall apart the moment lawyers get involved. Making things up always costs more later.' }
+    { t:'Document it cleanly with one safe proof, note the impact, and stop \u2014 don\u2019t go trawling real customer data.', req:{technical:30}, fx:{perf:8, technical:6, communication:2}, res:'You prove the flaw with a single screenshot and restraint. A great finding shows impact without abusing real people\u2019s data.', failRes:'You pull dozens of real customer records to \u201Cprove severity\u201D and now you\u2019re the one mishandling personal data. Sloppy.' },
+    { t:'Note the flaw and move on to find more issues.', fx:{perf:5, technical:3, stress:1}, res:'You log it and keep hunting. Efficient, though a crisper impact write-up would land harder with the client.' },
+    { t:'Download a big sample of customer data to show how bad it is.', fx:{perf:-7, communication:-2, stress:2}, res:'You just exfiltrated real personal data during a test. Proving a point by committing the harm is exactly backwards.' }
   ]},
-{ id:'t_supply', cats:['technical'], type:'Supply Chain', title:'Your software vendor got hacked',
-  text:'A small company whose software is installed deep inside your systems just announced it was breached. Their problem could quietly become yours.',
+{ id:'rd_crit', cats:['technical'], track:'red', tier:1, type:'Disclosure', title:'You found a way straight to the crown jewels',
+  text:'Two hours into the test you stumble onto a flaw that would let anyone take over the client\u2019s entire customer database \u2014 right now, today, even outside your test. Real attackers could be finding the same thing.',
   choices:[
-    { t:'Treat it as a possible intrusion: hunt for misuse, restrict the vendor\u2019s access, and demand details.', req:{technical:50}, fx:{perf:9, technical:6, business:3, stress:5}, res:'You move fast and find an early foothold the attackers planted. Catching it now averts a catastrophe.', failRes:'You lock the vendor\u2019s tool down so hard you break a critical workflow, and your hunt finds nothing \u2014 lots of pain, little insight.' },
-    { t:'Tighten the vendor\u2019s access and watch closely while you wait for their full report.', fx:{perf:5, technical:2, business:2, stress:2}, res:'A sensible middle path: you reduce the risk and stay alert without breaking anything.' },
-    { t:'Take their \u201Ccustomers aren\u2019t affected\u201D statement at face value.', fx:{perf:-8, stress:1}, res:'Trusting a breached vendor\u2019s early reassurance ages badly when the affected-customer list keeps growing.' }
+    { t:'Pause and alert the client immediately about the critical, actively-dangerous flaw, then continue.', req:{technical:30}, fx:{perf:9, technical:5, communication:4, stress:2}, res:'You don\u2019t sit on a live, exploitable hole for two weeks to pad your report. Flagging it now is the only ethical call.', failRes:'You try to alert them but bury it in jargon they don\u2019t grasp; the urgency is lost and the hole stays open for days.' },
+    { t:'Note it as your headline finding and keep testing.', fx:{perf:3, technical:3, stress:2}, res:'It\u2019ll be a great report \u2014 but a critical, exploitable-today flaw really shouldn\u2019t wait for the write-up.' },
+    { t:'Keep it quiet to make a dramatic reveal at the final readout.', fx:{perf:-10, communication:-3, stress:2}, res:'You gambled the client\u2019s data for a dramatic moment. If they\u2019d been breached in the meantime, that\u2019s on you.' }
   ]},
-{ id:'t_handoff', cats:['technical'], type:'Mentoring', title:'A teammate is drowning',
-  text:'A junior colleague is clearly stuck on a tricky investigation, and it\u2019s slowing the whole team down. You could just take it off their hands.',
+{ id:'rd_outage', cats:['technical'], track:'red', tier:2, type:'Engagement', title:'Your test just took their system down',
+  text:'A scan you launched hit a fragile server harder than expected and knocked the client\u2019s internal app offline. Staff can\u2019t work. The clock is running and so is the client\u2019s patience.',
   choices:[
-    { t:'Sit with them and coach them through it, even though it\u2019s slower today.', req:{leadership:25}, fx:{perf:6, leadership:5, communication:2, stress:1}, res:'They solve it with your guidance and level up. Next month they handle three like it alone. That\u2019s leverage.', failRes:'You mean to coach but get impatient and half-do it yourself; they feel sidelined and learn little.' },
-    { t:'Take the investigation over yourself to get it done.', fx:{perf:4, technical:2, stress:3}, res:'It\u2019s resolved quickly and correctly \u2014 but your teammate is no more capable than they were yesterday.' },
-    { t:'Tell them to figure it out; everyone learns the hard way.', fx:{perf:-5, leadership:-2, stress:2}, res:'They flounder, the investigation stalls, and morale dips. Sink-or-swim mostly just produces sinking.' }
+    { t:'Stop testing immediately, call the emergency contact, own it, and help them recover.', req:{technical:40}, fx:{perf:8, technical:4, communication:5, stress:4}, res:'Fast, honest ownership turns a screw-up into a trust-builder. They recover quickly and respect that you didn\u2019t hide.', failRes:'You scramble to fix it quietly first; the outage drags, they find out anyway, and the cover-up stings worse than the crash.' },
+    { t:'Pause that test, quietly confirm it recovers, then disclose in your daily check-in.', fx:{perf:4, technical:3, communication:1, stress:3}, res:'It comes back on its own and you report it promptly. Honest, if a touch slower than picking up the phone.' },
+    { t:'Carry on \u2014 fragile systems failing is kind of the point.', fx:{perf:-9, communication:-3, stress:3}, res:'Causing and ignoring an outage during a test torches the relationship. Finding weakness doesn\u2019t mean abandoning care.' }
   ]},
-{ id:'t_cloud', cats:['technical'], type:'Cloud', title:'Engineers left the door open',
-  text:'To move fast, the engineering team set up a new cloud system and left its storage open to the public internet. It holds internal data, and they\u2019re proud of how quickly they shipped.',
+{ id:'rd_social', cats:['technical'], track:'red', tier:2, type:'Social Eng', title:'Phishing your own client\u2019s staff',
+  text:'The engagement includes a phishing simulation \u2014 sending fake-but-harmless scam emails to the client\u2019s employees to test who clicks. One theme you\u2019re considering (fake layoff notices) would work brilliantly but could genuinely upset people.',
   choices:[
-    { t:'Lock it down now, then work with them so new systems ship safe-by-default in future.', req:{technical:40}, fx:{perf:8, technical:5, communication:3, business:2}, res:'You fix today\u2019s exposure and tomorrow\u2019s: new systems now lock themselves down automatically. Engineers actually thank you.', failRes:'You slam it shut with no warning, break their demo, and turn the team against security for the next quarter.' },
-    { t:'Close the public access and file a ticket explaining why.', fx:{perf:5, technical:2, stress:1}, res:'The data\u2019s no longer exposed. The fix is reactive, but it\u2019s done and documented.' },
-    { t:'Ask them politely to fix it when they get a chance.', fx:{perf:-7, stress:1}, res:'\u201CWhen they get a chance\u201D arrives after a researcher emails about your exposed data. Hope wasn\u2019t a control.' }
+    { t:'Pick a realistic-but-humane pretext, agree it with the client, and frame results as learning, not gotchas.', req:{technical:40}, fx:{perf:8, technical:4, communication:4, leadership:2}, res:'You get honest results without traumatizing anyone or breeding resentment toward security. Ethical and effective.', failRes:'Your pretext is fine but you name-and-shame the clickers in the report; morale craters and people now hate security.' },
+    { t:'Use a generic delivery-notification lure that nobody could take personally.', fx:{perf:5, technical:3, communication:1}, res:'Safe and uncontroversial. The click-rate data is useful, even if a sharper lure might have taught more.' },
+    { t:'Use the layoff scare \u2014 the higher the click-rate, the better the test.', fx:{perf:-7, communication:-3, stress:3}, res:'You got a great click-rate and a wave of genuinely distressed staff. Effective phishing tests don\u2019t require real cruelty.' }
   ]},
-{ id:'t_deepwork', cats:['technical'], type:'Focus', title:'Too many interruptions',
-  text:'You\u2019re mid-way through designing an important defense, but meetings and \u201Cquick questions\u201D keep shredding your day. You haven\u2019t had two uninterrupted hours all week.',
+{ id:'rd_oob', cats:['technical'], track:'red', tier:2, type:'Ethics', title:'You found something you weren\u2019t looking for',
+  text:'While testing, you stumble onto evidence the client may have already been breached months ago \u2014 by someone real \u2014 and possibly some genuinely illegal content on a server. This is well outside your scope.',
   choices:[
-    { t:'Block focus time on your calendar and set clear expectations with everyone about response times.', req:{communication:30}, fx:{perf:6, communication:4, stress:-5}, res:'You reclaim real thinking time and, because you communicated it well, nobody feels ignored. Output and sanity both recover.', failRes:'Your \u201Cdo not disturb\u201D comes across as aloof; a couple of stakeholders feel brushed off and grumble to your boss.' },
-    { t:'Come in early a couple of days for quiet hours.', fx:{perf:4, technical:2, stress:3}, res:'You claw back some focus, at the cost of longer days. It works, but it isn\u2019t sustainable forever.' },
-    { t:'Push through and multitask harder.', fx:{perf:-3, stress:7}, res:'Switching contexts all day means everything takes twice as long and nothing\u2019s done well. Burnout creeps closer.' }
+    { t:'Stop, preserve what you saw without digging further, and escalate to the client and legal channels carefully.', req:{technical:42}, fx:{perf:9, technical:5, communication:4, stress:5}, res:'You handle a genuinely thorny discovery with exactly the right restraint and escalation. This is judgment, not just hacking.', failRes:'You keep poking to confirm your hunch and end up tampering with what may be evidence \u2014 a legal mess for everyone, you included.' },
+    { t:'Note it factually in your findings and raise it at the next check-in.', fx:{perf:5, technical:2, communication:2, stress:3}, res:'You flag it through the proper channel without overstepping. Measured, if a fraction slower than picking up the phone.' },
+    { t:'Investigate it yourself to get the full story first.', fx:{perf:-8, communication:-2, stress:4}, res:'Chasing a real breach (and maybe a crime) outside your scope turns a finding into your liability. Stay in your lane.' }
   ]},
-{ id:'t_legacy', cats:['technical'], type:'Risk', title:'The ancient server nobody understands',
-  text:'A 15-year-old server that nobody fully understands still runs a critical part of the business. It can\u2019t be safely updated without risking an outage, and the person who built it left years ago.',
+{ id:'rd_exploit', cats:['technical'], track:'red', tier:3, type:'Tradecraft', title:'Off-the-shelf tools aren\u2019t getting in',
+  text:'The target is well-defended and the usual public tools bounce right off. You suspect a custom exploit could slip past their defenses \u2014 but writing one is risky, time-consuming, and could destabilize their systems if it goes wrong.',
   choices:[
-    { t:'Map out exactly what it does, wrap protective controls around it, and plan a careful replacement.', req:{technical:50}, fx:{perf:8, technical:6, business:3, stress:4}, res:'You de-risk the scary box without touching it directly, and chart a path off it. Methodical and respected.', failRes:'Your investigation accidentally disturbs the fragile system and triggers the very outage you feared. Painful lesson.' },
-    { t:'Wall it off from everything it doesn\u2019t absolutely need to talk to.', fx:{perf:5, technical:3, stress:2}, res:'You shrink the damage if it\u2019s ever compromised. The ancient box lives on, but more safely caged.' },
-    { t:'Leave it alone \u2014 if it isn\u2019t broken, don\u2019t touch it.', fx:{perf:-4, business:-1}, res:'Ignored risk is still risk. The ticking just gets louder, and auditors love finding an unsupported system.' }
+    { t:'Develop a careful, tested custom exploit in a lab first, then use it surgically against the live target.', req:{technical:54}, fx:{perf:9, technical:7, stress:4}, res:'Your bespoke exploit proves a flaw their defenses (and their off-the-shelf scanners) completely missed. Elite, responsible tradecraft.', failRes:'You rush the exploit straight at production without lab-testing; it misfires, crashes a service, and proves only that you skipped a step.' },
+    { t:'Document the defenses as effective against common attacks and focus elsewhere.', fx:{perf:5, technical:3, communication:2}, res:'\u201CYour defenses stopped the standard playbook\u201D is itself a valuable, honest finding. You spend your time where it pays off.' },
+    { t:'Throw every public exploit at it and hope something sticks.', fx:{perf:-6, technical:-1, stress:3}, res:'Spraying noisy public exploits at a hardened target just lights up their alerts and wastes the engagement.' }
+  ]},
+{ id:'rd_report', cats:['technical'], track:'red', tier:3, type:'Disclosure', title:'The client wants the bad findings softened',
+  text:'Your report lists several serious flaws. The client\u2019s manager \u2014 whose team built the flawed systems \u2014 quietly asks you to \u201Ctone it down\u201D so it looks better to their executives. Your integrity and your repeat business are both on the line.',
+  choices:[
+    { t:'Keep the findings accurate, but reframe them constructively \u2014 clear risks plus a credible path to fix.', req:{technical:50}, fx:{perf:9, technical:4, communication:5}, res:'You refuse to fake the facts but make them usable, so the manager gets a roadmap instead of a beating. Integrity and tact.', failRes:'You try to please everyone and blur the severity; executives later get blindsided by a \u201Cminor\u201D issue and trust in you collapses.' },
+    { t:'Present the facts plainly and let the client decide what to share upward.', fx:{perf:5, communication:2, technical:2, stress:2}, res:'You hold the line on accuracy and stay out of their politics. Honest and clean, if a little blunt.' },
+    { t:'Soften the wording to keep the client happy.', fx:{perf:-9, technical:-2, communication:-2, stress:3}, res:'A pen-test report you let someone edit for vanity is worthless \u2014 and when a softened flaw gets exploited, your name is on it.' }
+  ]},
+{ id:'rd_purple', cats:['technical'], track:'red', tier:3, type:'Purple Team', title:'The defenders never even saw you',
+  text:'You walked through the client\u2019s network and their defenders (the blue team) detected almost none of it. You could write a scathing report \u2014 or you could sit down with them and turn your attack into their education (a \u201Cpurple team\u201D approach).',
+  choices:[
+    { t:'Run a collaborative replay with the defenders, building detections together for each step you took.', req:{technical:50}, fx:{perf:9, technical:6, communication:4, leadership:2}, res:'They leave able to catch the very attacks they missed. The point of red teaming is a stronger blue team, not a humiliated one.', failRes:'Your replay turns into a lecture that talks down to them; they get defensive and learn far less than they could have.' },
+    { t:'Deliver a thorough written report mapping each step to a missing detection.', fx:{perf:5, technical:4, communication:2}, res:'A detailed, mapped report gives them a clear to-do list. Useful, even without the live collaboration.' },
+    { t:'Write up how thoroughly you owned them and let the findings sting.', fx:{perf:-6, communication:-3, leadership:-1, stress:2}, res:'A gloating report makes you look clever and the defenders dig in. You proved a point and improved nothing.' }
+  ]},
+
+/* --- BUILD: security engineering --- */
+{ id:'bd_secrets', cats:['technical'], track:'build', tier:1, type:'Code', title:'A password is hard-coded in the app',
+  text:'Reviewing a teammate\u2019s code before it ships, you spot a database password typed directly into the source \u2014 and that code is about to be published where anyone can read it. Leaked secrets like this are behind countless breaches.',
+  choices:[
+    { t:'Block the release, move the secret into a proper secrets vault, and add an automated scan so it can\u2019t recur.', req:{technical:30}, fx:{perf:9, technical:6, stress:2}, res:'You fix this instance and the whole class of problem \u2014 from now on, leaked secrets get caught automatically. Engineering at its best.', failRes:'You pull the secret out but skip the automated guard; a different secret leaks the same way two sprints later.' },
+    { t:'Ask the teammate to move the password into a config file before release.', fx:{perf:5, technical:3, communication:1}, res:'The secret\u2019s out of the public code. A vault would be sturdier, but you stopped the leak.' },
+    { t:'Let it ship and rotate the password afterward.', fx:{perf:-8, technical:-1, stress:1}, res:'\u201CAfterward\u201D is too late \u2014 bots scrape new code for secrets within minutes of it going public.' }
+  ]},
+{ id:'bd_s3', cats:['technical'], track:'build', tier:1, type:'Cloud', title:'A storage bucket is open to the world',
+  text:'You discover a cloud storage bucket holding internal files is set to \u201Cpublic,\u201D readable by anyone on the internet. Misconfigured buckets like this have leaked data at some of the biggest companies in the world.',
+  choices:[
+    { t:'Lock it down now, audit who could have accessed it, and scan for any other public buckets.', req:{technical:30}, fx:{perf:8, technical:6, stress:2}, res:'You close this hole and sweep for siblings \u2014 finding one more. One exposed bucket usually means others.', failRes:'You fix the one you found but don\u2019t sweep; a second public bucket surfaces in a researcher\u2019s email next month.' },
+    { t:'Set the bucket to private and note it for the owning team.', fx:{perf:5, technical:3, stress:1}, res:'The data\u2019s no longer exposed and the team\u2019s aware. A clean, contained fix.' },
+    { t:'Message the owning team to fix it when convenient.', fx:{perf:-7, stress:1}, res:'\u201CWhen convenient\u201D is a lifetime online. Someone scrapes the open bucket before the team gets to it.' }
+  ]},
+{ id:'bd_iam', cats:['technical'], track:'build', tier:1, type:'Access', title:'Everyone\u2019s an admin',
+  text:'You notice almost every engineer has full administrator rights \u201Cto save time.\u201D If any one of their laptops is compromised, an attacker instantly owns everything. The principle of least privilege says people should only have the access they actually need.',
+  choices:[
+    { t:'Map who truly needs what, then roll out least-privilege access with a smooth request process.', req:{technical:32}, fx:{perf:8, technical:6, communication:2, stress:2}, res:'You shrink the blast radius dramatically while keeping engineers productive. Done well, security people barely notice the change.', failRes:'You yank admin rights overnight with no easy way to request access; work grinds to a halt and engineers revolt.' },
+    { t:'Remove admin from the few accounts that clearly don\u2019t need it.', fx:{perf:5, technical:3, stress:1}, res:'A sensible start that trims the riskiest excess without a big fight. The rest can follow later.' },
+    { t:'Leave it \u2014 changing it would slow everyone down.', fx:{perf:-6, technical:-1, stress:1}, res:'Convenience for all is convenience for the attacker too. The first phished laptop becomes a company-wide compromise.' }
+  ]},
+{ id:'bd_pipeline', cats:['technical'], track:'build', tier:2, type:'Supply Chain', title:'Your software build process is wide open',
+  text:'Your build pipeline \u2014 the automated system that assembles and ships your software \u2014 can be modified by almost anyone, with no review. This is exactly the weakness behind the SolarWinds attack, where intruders poisoned software at the source and it shipped to thousands.',
+  choices:[
+    { t:'Lock down the pipeline: signed builds, mandatory review, and a record of exactly what went into each release.', req:{technical:44}, fx:{perf:9, technical:7, business:2, stress:3}, res:'You make tampering detectable and traceable \u2014 turning your build process from a soft target into a hard one. Real supply-chain defense.', failRes:'You bolt on controls without buy-in and break the pipeline for a day; engineers route around your half-built guardrails.' },
+    { t:'Require code review and restrict who can change the pipeline.', fx:{perf:5, technical:4, stress:2}, res:'Tighter access and review close the most obvious door. Not bulletproof, but far harder to slip poison through.' },
+    { t:'Trust the team \u2014 they\u2019re careful.', fx:{perf:-7, technical:-1, stress:2}, res:'SolarWinds trusted their team too. An unguarded build pipeline is one compromised account away from disaster.' }
+  ]},
+{ id:'bd_mfa', cats:['technical'], track:'build', tier:2, type:'Identity', title:'Rolling out a second login step',
+  text:'Most break-ins start with a stolen password. Multi-factor authentication \u2014 a second step like a phone tap \u2014 stops the vast majority of them. But you have to roll it out to thousands of people who will grumble about the friction.',
+  choices:[
+    { t:'Phase it in with clear comms, easy enrollment, and exceptions handled gracefully \u2014 starting with the riskiest accounts.', req:{technical:40}, fx:{perf:8, technical:5, communication:4, stress:2}, res:'You close the single biggest door attackers use, and the thoughtful rollout means people grumble for a week, then forget it was ever new.', failRes:'You force it on everyone overnight with a clunky tool; lockouts flood the help desk and people associate security with pain.' },
+    { t:'Mandate it for admins and sensitive systems first.', fx:{perf:6, technical:4, stress:1}, res:'You protect the highest-value accounts immediately \u2014 the best bang for the buck while the broad rollout waits.' },
+    { t:'Make it optional so nobody complains.', fx:{perf:-6, technical:-1, stress:-1}, res:'Optional security is the security almost nobody turns on. The accounts that skip it are the ones that get popped.' }
+  ]},
+{ id:'bd_dep', cats:['technical'], track:'build', tier:2, type:'Vulnerability', title:'A flaw buried in code you didn\u2019t write',
+  text:'A critical flaw drops in an open-source component your apps quietly depend on (the Log4Shell scenario, from the builder\u2019s side). The catch: nobody has a clear list of which of your apps even use it.',
+  choices:[
+    { t:'Build an inventory of what uses the component (an SBOM), patch by risk, and keep the inventory for next time.', req:{technical:44}, fx:{perf:9, technical:7, business:2, stress:4}, res:'You fix today\u2019s fire and make the next one a five-minute lookup instead of a week of panic. Knowing what you run is half the battle.', failRes:'You patch the apps you can think of from memory and miss two; the gap surfaces in the post-incident review.' },
+    { t:'Patch the internet-facing apps you know use it, fast.', fx:{perf:6, technical:4, stress:3}, res:'You cover the most exposed, most likely targets first. Solid triage, even if the long tail waits.' },
+    { t:'Wait for each app team to sort out their own dependencies.', fx:{perf:-8, stress:2}, res:'Leaving a critical flaw to a dozen busy teams means it never fully gets fixed. Attackers only need the one app everyone forgot.' }
+  ]},
+{ id:'bd_guardrails', cats:['technical'], track:'build', tier:3, type:'Platform', title:'Security keeps saying no after the fact',
+  text:'Engineering ships fast and your team is forever catching problems too late, playing whack-a-mole. You could instead build guardrails into the platform so the secure way is the default, automatic path \u2014 mistakes become hard to make in the first place.',
+  choices:[
+    { t:'Invest in paved-road defaults: secure templates and automated checks built into how everyone ships.', req:{technical:52}, fx:{perf:9, technical:7, business:3, stress:-2}, res:'Engineers get secure-by-default for free and ship faster; your team stops firefighting. Prevention scales in a way policing never will.', failRes:'You build rigid guardrails without consulting engineers; they\u2019re too restrictive, get bypassed, and your effort is wasted.' },
+    { t:'Add automated security checks to the release pipeline.', fx:{perf:6, technical:4, stress:1}, res:'Catching issues automatically at release beats catching them by hand in production. A strong, practical step.' },
+    { t:'Keep reviewing things manually \u2014 it works.', fx:{perf:-5, technical:-1, stress:3}, res:'Manual review doesn\u2019t scale with the company. You stay the bottleneck, and the things you miss keep shipping.' }
+  ]},
+{ id:'bd_logging', cats:['technical'], track:'build', tier:3, type:'Detection Eng', title:'When something breaks, you\u2019re blind',
+  text:'During the last incident, the defenders had almost no useful data \u2014 critical systems simply weren\u2019t recording what happened. As the engineer, you can build the telemetry (the logging and monitoring) that future investigations will live or die by.',
+  choices:[
+    { t:'Design and roll out consistent, security-relevant logging across key systems, tuned to real attack techniques.', req:{technical:52}, fx:{perf:9, technical:7, communication:2, stress:3}, res:'Next incident, the responders actually have the breadcrumbs they need. You can\u2019t defend what you can\u2019t see \u2014 and now you can see.', failRes:'You log everything indiscriminately; the cost balloons and the real signals drown in noise nobody can search.' },
+    { t:'Turn on solid logging for the most critical systems first.', fx:{perf:6, technical:4, stress:2}, res:'You light up the highest-value systems where visibility matters most. A focused, fundable start.' },
+    { t:'Leave logging to each system\u2019s defaults.', fx:{perf:-5, technical:-1, stress:1}, res:'Default logging is built for debugging, not for catching attackers. The next investigation hits the same wall.' }
+  ]},
+{ id:'bd_segment', cats:['technical'], track:'build', tier:3, type:'Architecture', title:'One break-in reaches everything',
+  text:'The network is flat \u2014 break into any laptop and you can reach the crown-jewel systems directly. You want to segment it so a single compromise can\u2019t spread, but it\u2019s a big, delicate change to live infrastructure.',
+  choices:[
+    { t:'Design phased segmentation, ringfencing the crown jewels first and proving each step before the next.', req:{technical:54}, fx:{perf:9, technical:7, business:3, stress:3}, res:'You turn \u201Cone breach owns everything\u201D into \u201Cone breach is contained.\u201D Phasing makes a daunting project safe and fundable.', failRes:'You re-architect too aggressively and sever a dependency you didn\u2019t map; a key system goes dark and confidence in the project tanks.' },
+    { t:'Isolate just the most critical systems behind tighter controls.', fx:{perf:6, technical:4, stress:2}, res:'The crown jewels are now far harder to reach, even if the rest of the network waits. Real risk reduction.' },
+    { t:'Leave the network flat \u2014 re-architecting is too risky.', fx:{perf:-5, business:-1, stress:1}, res:'A flat network is a gift to attackers: one foothold becomes total control. The risk you avoided touching only grew.' }
+  ]},
+
+/* --- ANY TRACK: fundamentals (tier 1) & architecture (tier 3-4) --- */
+{ id:'an_rule', cats:['technical'], track:'any', tier:1, type:'Ethics', title:'A colleague asks you to bend a rule',
+  text:'A friendly senior colleague asks you to quietly share your access so they can \u201Cskip the paperwork\u201D on an urgent task. It would help them out and they\u2019re clearly trustworthy \u2014 but sharing credentials breaks a basic rule for good reasons.',
+  choices:[
+    { t:'Politely decline and help them get their own access fast through the proper route.', req:{technical:25}, fx:{perf:7, technical:3, communication:3}, res:'You hold the line without being a jobsworth \u2014 and solve their actual problem. Shared credentials are how small favors become big breaches.', failRes:'You over-explain the policy and lecture them; they get the access elsewhere and you\u2019ve gained a reputation as the difficult one for no benefit.' },
+    { t:'Ask your manager how to handle it before doing anything.', fx:{perf:4, communication:2, stress:1}, res:'Escalating an awkward ask is never wrong early in your career. Your manager backs you up.' },
+    { t:'Share your login just this once \u2014 they\u2019re trustworthy.', fx:{perf:-7, technical:-2, stress:2}, res:'Now actions taken under your name aren\u2019t yours, and the rule existed precisely for the \u201Cjust this once\u201D that goes wrong.' }
+  ]},
+{ id:'an_password', cats:['technical'], track:'any', tier:1, type:'Hygiene', title:'The same admin password everywhere',
+  text:'You discover the same simple administrator password is reused across dozens of important systems. Crack or phish it once, and an attacker owns all of them. It\u2019s one of the most common ways break-ins escalate.',
+  choices:[
+    { t:'Roll out unique, vaulted passwords for those accounts and enable a second login step on the critical ones.', req:{technical:30}, fx:{perf:8, technical:5, stress:2}, res:'You break the \u201Cone key fits all locks\u201D problem. Now a single stolen password no longer cascades into everything.', failRes:'You change them all at once without coordinating; two automated jobs that used the old password break and you spend the night untangling it.' },
+    { t:'Change the password on the most critical systems first.', fx:{perf:5, technical:3, stress:1}, res:'You protect the highest-value systems immediately and chip away at the rest. Sensible prioritization.' },
+    { t:'Note it as a risk to address later.', fx:{perf:-6, technical:-1}, res:'A reused master password is a live grenade, not a backlog item. \u201CLater\u201D is whenever the attacker decides.' }
+  ]},
+{ id:'an_legacy', cats:['technical'], track:'any', tier:3, type:'Risk', title:'The ancient server nobody understands',
+  text:'A 15-year-old server still runs something critical, can\u2019t be safely updated, and the person who built it left long ago. Touch it wrong and the business stops; leave it and it\u2019s a soft target.',
+  choices:[
+    { t:'Map exactly what it does, wrap protective controls around it, and plan a careful replacement.', req:{technical:50}, fx:{perf:8, technical:6, business:3, stress:4}, res:'You de-risk the scary box without disturbing it and chart a real path off it. Methodical and respected.', failRes:'Your probing disturbs the fragile system and triggers the very outage you feared. A hard way to learn caution.' },
+    { t:'Wall it off from everything it doesn\u2019t absolutely need to reach.', fx:{perf:5, technical:4, stress:2}, res:'You shrink the damage if it\u2019s ever compromised. The relic lives on, but caged.' },
+    { t:'Leave it alone \u2014 if it isn\u2019t broken, don\u2019t touch it.', fx:{perf:-4, business:-1}, res:'Ignored risk is still risk, and auditors love finding an unsupported system propping up the business.' }
+  ]},
+{ id:'an_threatmodel', cats:['technical'], track:'any', tier:3, type:'Design', title:'A flagship product, designed without security',
+  text:'The company\u2019s new flagship product is racing toward launch, and security was never in the room. You can run a threat-modeling session \u2014 systematically asking \u201Chow could this be attacked?\u201D \u2014 before it ships, or let it go and hope.',
+  choices:[
+    { t:'Facilitate a focused threat-modeling workshop with the product team and turn the top risks into fixes before launch.', req:{technical:52}, fx:{perf:9, technical:6, communication:3, business:2}, res:'You catch design flaws now, when they\u2019re cheap to fix, instead of after launch when they\u2019re a breach. Security earns a seat at the table.', failRes:'Your session is abstract and academic; the product team tunes out and ships with the same flaws you failed to make real to them.' },
+    { t:'Review the riskiest single component and flag its issues.', fx:{perf:6, technical:4, stress:1}, res:'You can\u2019t cover everything pre-launch, but securing the riskiest piece meaningfully lowers the odds of a bad day.' },
+    { t:'Let it ship and review security in a later version.', fx:{perf:-6, business:-1, stress:2}, res:'Bolting security on after launch costs ten times as much \u2014 and the flaws are live in the meantime.' }
+  ]},
+{ id:'an_zerotrust', cats:['technical'], track:'any', tier:4, type:'Architecture', title:'\u201CInside the network\u201D no longer means safe',
+  text:'Your security still assumes anyone inside the corporate network is trustworthy \u2014 a model that collapses the moment one laptop is compromised or someone works from a cafe. The modern answer is \u201Czero trust\u201D: verify every request, every time, regardless of where it comes from. It\u2019s a multi-year shift.',
+  choices:[
+    { t:'Set a phased zero-trust roadmap anchored on strong identity and per-request checks, sequenced by risk.', req:{technical:60}, fx:{perf:9, technical:7, business:4, communication:3, stress:3}, res:'You give the company a credible, fundable path off the crumbling \u201Ctrusted network\u201D model. Architecture that ages well.', failRes:'You chase the buzzword and try to boil the ocean at once; the program stalls under its own weight and skeptics pounce.' },
+    { t:'Start with the highest-impact piece: strong identity and access checks on critical apps.', fx:{perf:6, technical:5, business:2, stress:2}, res:'You plant zero trust where it pays off first and prove the model before scaling. Pragmatic architecture.' },
+    { t:'Keep trusting the internal network \u2014 it\u2019s worked so far.', fx:{perf:-6, technical:-2, business:-1, stress:1}, res:'\u201CWorked so far\u201D is survivorship bias. The flat, trusted network is exactly what turns one phish into a company-wide breach.' }
+  ]},
+{ id:'an_identity', cats:['technical'], track:'any', tier:4, type:'Architecture', title:'Identity is held together with tape',
+  text:'Logins are scattered across a dozen disconnected systems, ex-employees\u2019 accounts linger for months, and there\u2019s no single source of truth for who can access what. Identity is now the real perimeter \u2014 and yours is a mess.',
+  choices:[
+    { t:'Architect unified identity: single sign-on, automatic joiner/mover/leaver, and conditional access by risk.', req:{technical:60}, fx:{perf:9, technical:7, business:4, stress:3}, res:'You make access provable, revocable, and risk-aware across the company. Get identity right and half of security follows.', failRes:'You pick an over-complex design and a migration nobody can finish; the half-built system is messier than the tape it replaced.' },
+    { t:'Fix the worst gap first: automatically disable accounts the day someone leaves.', fx:{perf:6, technical:4, business:2, stress:2}, res:'Closing the lingering-access hole removes a favorite attacker (and ex-employee) entry point. A high-value first move.' },
+    { t:'Keep managing identity system-by-system as you do now.', fx:{perf:-6, technical:-2, stress:2}, res:'Fragmented identity guarantees forgotten accounts and blind spots \u2014 the seams an attacker walks right through.' }
+  ]},
+{ id:'an_thirdparty', cats:['technical'], track:'any', tier:4, type:'Supply Chain', title:'Hundreds of vendors, no oversight',
+  text:'Hundreds of outside vendors and software suppliers plug into your systems, and nobody really tracks the risk they bring. A breach at one of them (the Target and SolarWinds lesson) becomes a breach at you \u2014 and you\u2019d have no idea until it\u2019s too late.',
+  choices:[
+    { t:'Build a risk-tiered third-party program: know who has access to what, hold the critical ones to real standards, and monitor.', req:{technical:60}, fx:{perf:9, technical:6, business:5, communication:3, stress:4}, res:'You turn an invisible mountain of risk into something measured and managed. Most big breaches now come through a supplier \u2014 and you\u2019re ready.', failRes:'You send every vendor a giant questionnaire and drown in paper that nobody reads; real risk stays exactly where it was.' },
+    { t:'Focus first on the handful of vendors with deep access to critical systems.', fx:{perf:6, technical:4, business:3, stress:2}, res:'You concentrate scrutiny where a breach would hurt most. The long tail can wait; the crown-jewel vendors can\u2019t.' },
+    { t:'Trust that vendors handle their own security.', fx:{perf:-7, business:-2, stress:2}, res:'Their security is now your security, whether you manage it or not. The supplier breach arrives without warning.' }
+  ]},
+{ id:'an_breach_ic', cats:['technical'], track:'any', tier:3, type:'Incident', title:'You\u2019re the senior tech in a live breach',
+  text:'A real intrusion is unfolding and, as the most senior technical person on shift, everyone is looking to you. Executives want answers, responders need direction, and the attacker is still active. There\u2019s no manager to hide behind tonight.',
+  choices:[
+    { t:'Take technical command: assign clear tasks, keep a tight evidence trail, and feed leadership steady, honest updates.', req:{technical:52}, fx:{perf:10, technical:7, communication:4, leadership:3, stress:6}, res:'Your calm coordination turns a scramble into a controlled response that ejects the attacker. This is the moment seniors are made.', failRes:'You try to personally do every technical task and the coordination collapses; responders duplicate work while the attacker moves freely.' },
+    { t:'Anchor on the technical work and ask a teammate to handle exec updates.', fx:{perf:7, technical:5, communication:2, stress:5}, res:'You play to your strength and delegate the comms. The response holds together and the attacker is contained.' },
+    { t:'Wait for instructions before acting.', fx:{perf:-9, stress:5}, res:'Hesitation during an active breach hands the attacker time and the room loses confidence in you. Seniority means stepping up.' }
   ]},
 
 /* ---------------- PEOPLE ---------------- */
