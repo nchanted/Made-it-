@@ -247,16 +247,7 @@
       var sc = MadeIt.scenario();
       if (!sc) return '<div class="event panel"><div class="body">Loading...</div></div>';
       var choices = sc.choices.map(function (c, i) {
-        var locked = MadeIt.choiceLocked(c);
-        var req = '';
-        if (c.req) {
-          var bits = [];
-          for (var k in c.req) if (c.req.hasOwnProperty(k)) bits.push(SKILL_LABEL[k] + ' ' + c.req[k]);
-          req = '<span class="req">' + (locked ? '\uD83D\uDD12 Needs ' : '\u2713 ') + esc(bits.join(' \u00b7 ')) + '</span>';
-        }
-        return '<button class="choice' + (locked ? ' locked' : '') + '"' +
-               (locked ? ' disabled' : ' data-choice="' + i + '"') + '>' +
-               esc(c.t) + req + '</button>';
+        return '<button class="choice" data-choice="' + i + '">' + esc(c.t) + '</button>';
       }).join('');
       return '' +
         '<div class="event panel grow">' +

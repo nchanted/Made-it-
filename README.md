@@ -63,10 +63,11 @@ Then find it under the repo's **Releases**.
   executive/board-level dilemmas.
 - **Meters:** Performance and Stress, plus four skills — Technical, Leadership,
   Business, Comms. The ★ marks the skill that matters most in your current role.
-- **Skill-gated choices.** The best option in a scenario is often locked until
-  you've built the relevant skill (shown as 🔒 Needs Leadership 30, etc.). A
-  promotion gives you onboarding experience in the new discipline so you arrive
-  able to compete.
+- **Read the situation.** Every option is selectable, and the game never tells
+  you which is "correct." Some scenarios reward a bold, expert move; others
+  reward a humble, pragmatic one. If you attempt a bold play your skills aren't
+  ready for, it backfires \u2014 so weigh each choice against your own skill meters
+  and the situation, not against a label.
 - **Reviews** happen every 8 weeks: bonuses if you're doing well, warnings if
   you're not. A strong quarter can walk back a warning.
 - **Promotions** appear when you meet the bar (time in role + performance +
@@ -123,7 +124,10 @@ career stage it appears in (`technical`, `people`, `budget`, `executive`):
 ```
 `fx` keys: `perf`, `technical`, `leadership`, `business`, `communication`,
 `stress`, and `money` (in dollars). Positive `perf` is good; positive `stress`
-is bad. `req` locks the choice until the player's skill reaches the value.
+is bad. `req` marks an option as needing expertise: if the player meets it, they
+get the `fx`/`res` above; if not, the move backfires (reduced/penalised effects
+and an optional `failRes` message). The requirement is never shown in-game, so
+players judge readiness from their own skill meters.
 
 **Add a rank / change the ladder** — edit `RANKS`. Each rank lists what you need
 to be promoted *out* (`req`) and which role(s) you go *into* (`next`). Give a

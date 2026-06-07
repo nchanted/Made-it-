@@ -106,14 +106,15 @@
     drawScenario: function () {
       var st = this.state, cat = this.category();
       if (!st.seen[cat]) st.seen[cat] = [];
-      var pool = SCENARIOS.filter(function (s) {
-        return s.cats.indexOf(cat) !== -1 && st.seen[cat].indexOf(s.id) === -1;
-      });
-      if (!pool.length) {                  // exhausted — reshuffle, avoid immediate repeat
-        st.seen[cat] = st.current ? [st.current] : [];
-        pool = SCENARIOS.filter(function (s) {
-          return s.cats.indexOf(cat) !== -1 && st.seen[cat].indexOf(s.id) === -1;
-        });
+      var inCat = SCENARIOS.filter(function (s) { return s.cats.indexOf(cat) !== -1; });
+      var pool = inCat.filter(function (s) { return st.seen[cat].indexOf(s.id) === -1; });
+      if (!pool.length) {
+        // Pool exhausted. Reshuffle, but keep the most recently seen ones out of
+        // rotation so nothing reappears soon after it was shown.
+        var keep = Math.min(st.seen[cat].length, Math.max(3, Math.floor(inCat.length / 3)));
+        st.seen[cat] = st.seen[cat].slice(-keep);
+        pool = inCat.filter(function (s) { return st.seen[cat].indexOf(s.id) === -1; });
+        if (!pool.length) { st.seen[cat] = st.current ? [st.current] : []; pool = inCat.filter(function (s) { return s.id !== st.current; }); }
       }
       var s = pick(pool);
       st.current = s.id;
@@ -128,44 +129,67 @@
       return null;
     },
 
-    choiceLocked: function (choice) {
-      if (!choice.req) return false;
+    meetsReq: function (choice) {
+      if (!choice.req) return true;
       var sk = this.state.skills;
-      for (var k in choice.req) { if (choice.req.hasOwnProperty(k)) { if ((sk[k] || 0) < choice.req[k]) return true; } }
-      return false;
+      for (var k in choice.req) { if (choice.req.hasOwnProperty(k)) { if ((sk[k] || 0) < choice.req[k]) return false; } }
+      return true;
     },
+    choiceLocked: function () { return false; },
+
+    botchMessages: [
+      'You reach for a move beyond your current experience, and it shows. The execution is shaky, the situation gets messier, and people notice.',
+      'It is the right instinct but the wrong hands — you have not done this enough to pull it off cleanly. It backfires and costs you some credibility.',
+      'Ambitious, but you are out of your depth here. The approach unravels halfway through and you spend the rest of the week cleaning it up.',
+      'You bite off more than you can chew. Without the experience to land it, the bold play stumbles and leaves things worse than before.'
+    ],
 
     /* ---- apply a choice ---- */
     choose: function (idx) {
       var st = this.state, sc = this.scenario();
       if (!sc || st.phase !== 'play') return;
       var c = sc.choices[idx];
-      if (!c || this.choiceLocked(c)) return;
+      if (!c) return;
 
-      var fx = c.fx || {}, deltas = [], hadGoodPerf = false, hadBadPerf = false, gotCash = 0, k;
+      var met = this.meetsReq(c);
+      var fx = c.fx || {}, eff = {}, res, k;
 
-      if (typeof fx.perf === 'number') {
-        st.perf = clamp(st.perf + fx.perf, 0, 100);
-        deltas.push({ label: 'Performance', n: fx.perf, kind: fx.perf >= 0 ? 'up' : 'down' });
-        if (fx.perf > 0) hadGoodPerf = true; if (fx.perf < 0) hadBadPerf = true;
+      if (met) {
+        for (k in fx) if (fx.hasOwnProperty(k)) eff[k] = fx[k];
+        res = c.res;
+      } else {
+        eff.perf = (typeof fx.perf === 'number' && fx.perf > 0) ? -(Math.round(fx.perf * 0.6) + 2)
+                 : ((fx.perf || 0) - 2);
+        eff.stress = Math.max(4, (fx.stress || 0)) + 4;
+        SKILLS.forEach(function (sk) {
+          if (typeof fx[sk] === 'number') eff[sk] = fx[sk] > 0 ? 1 : fx[sk];
+        });
+        if (typeof fx.money === 'number' && fx.money < 0) eff.money = fx.money;
+        res = c.failRes || this.botchMessages[(Math.random() * this.botchMessages.length) | 0];
       }
-      SKILLS.forEach(function (s) {
-        if (typeof fx[s] === 'number') {
-          st.skills[s] = clamp((st.skills[s] || 0) + fx[s], 0, 100);
-          deltas.push({ label: SKILL_LABEL[s], n: fx[s], kind: fx[s] >= 0 ? 'up' : 'down' });
+
+      var deltas = [], hadGoodPerf = false, hadBadPerf = false, gotCash = 0;
+      if (typeof eff.perf === 'number' && eff.perf !== 0) {
+        st.perf = clamp(st.perf + eff.perf, 0, 100);
+        deltas.push({ label: 'Performance', n: eff.perf, kind: eff.perf >= 0 ? 'up' : 'down' });
+        if (eff.perf > 0) hadGoodPerf = true; if (eff.perf < 0) hadBadPerf = true;
+      }
+      SKILLS.forEach(function (sk) {
+        if (typeof eff[sk] === 'number' && eff[sk] !== 0) {
+          st.skills[sk] = clamp((st.skills[sk] || 0) + eff[sk], 0, 100);
+          deltas.push({ label: SKILL_LABEL[sk], n: eff[sk], kind: eff[sk] >= 0 ? 'up' : 'down' });
         }
       });
-      if (typeof fx.stress === 'number') {
-        st.stress = clamp(st.stress + fx.stress, 0, 100);
-        // rising stress is bad → red(down); falling stress is good → green(up)
-        deltas.push({ label: 'Stress', n: fx.stress, kind: fx.stress > 0 ? 'down' : 'up' });
+      if (typeof eff.stress === 'number' && eff.stress !== 0) {
+        st.stress = clamp(st.stress + eff.stress, 0, 100);
+        deltas.push({ label: 'Stress', n: eff.stress, kind: eff.stress > 0 ? 'down' : 'up' });
       }
-      if (typeof fx.money === 'number' && fx.money !== 0) {
-        gotCash = fx.money; st.money += fx.money;
-        deltas.push({ label: 'money', n: fx.money, kind: 'cash' });
+      if (typeof eff.money === 'number' && eff.money !== 0) {
+        gotCash = eff.money; st.money += eff.money;
+        deltas.push({ label: 'money', n: eff.money, kind: 'cash' });
       }
 
-      st.outcome = { res: c.res, deltas: deltas };
+      st.outcome = { res: res, deltas: deltas, botched: !met };
       st.phase = 'outcome';
 
       if (hadBadPerf && !hadGoodPerf) Sound.bad(); else if (hadGoodPerf) Sound.good(); else Sound.tap();
