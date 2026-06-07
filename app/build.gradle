@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.madeit.game'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.madeit.game"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        debug {
+            // Debug APK is unsigned-debug-signed automatically by AGP.
+            applicationIdSuffix ""
+            debuggable true
+        }
+        release {
+            minifyEnabled false
+            // No signing config here so the workflow produces an unsigned release
+            // (the debug APK is the easy installable one). See README.
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // No dependencies needed: the app uses only the Android platform WebView.
+}
+
+dependencies {
+}
