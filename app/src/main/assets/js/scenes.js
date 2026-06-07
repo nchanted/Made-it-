@@ -25,9 +25,41 @@ const Scenes = (function(){
     return 'worried';
   }
 
+  /* ---- Character customization palettes ----
+     skin is a [base, shade] pair; everything else is a value the avatar
+     reads directly, so saved games stay valid even if order changes. */
+  const LOOKS = {
+    skins: [
+      ['#f6d2b3','#e6b48d'], ['#efc09a','#dba376'], ['#e8b88f','#d49b72'],
+      ['#c98a55','#ab6f3e'], ['#9c6438','#7d4d2a'], ['#6f4528','#553218']
+    ],
+    skinNames: ['Light','Fair','Medium','Tan','Brown','Deep'],
+    hairColors: ['#20242e','#5b3a22','#caa052','#8a3b1e','#9aa3b2','#19b3a6'],
+    hairColorNames: ['Black','Brown','Blonde','Auburn','Grey','Teal'],
+    hairStyles: ['short','buzz','curly','long','bun','bald'],
+    hairStyleNames: ['Short','Buzz','Curly','Long','Top Knot','Bald'],
+    glasses: ['none','round','square'],
+    glassesNames: ['None','Round','Square']
+  };
+  const DEFAULT_LOOK = {
+    skin: LOOKS.skins[2], hair: LOOKS.hairColors[0],
+    hairStyle: 'short', glasses: 'none', beard: false
+  };
+  function cloneLook(l){
+    l = l || DEFAULT_LOOK;
+    return { skin: l.skin.slice(), hair: l.hair, hairStyle: l.hairStyle, glasses: l.glasses, beard: !!l.beard };
+  }
+  function randomLook(){
+    function r(a){ return a[(Math.random()*a.length)|0]; }
+    return { skin: r(LOOKS.skins), hair: r(LOOKS.hairColors),
+             hairStyle: r(LOOKS.hairStyles), glasses: r(LOOKS.glasses),
+             beard: Math.random() < 0.4 };
+  }
+
   /* ---- Avatar ---- */
-  function avatar(cx, baseY, s, outfit, mood){
-    const skin = '#e8b88f', skinShade = '#d49b72', hair = '#2a2f3d';
+  function avatar(cx, baseY, s, outfit, mood, look){
+    const L = cloneLook(look);
+    const skin = L.skin[0], skinShade = L.skin[1], hair = L.hair;
     // body color per outfit
     const body = {
       casual:'#3c5278', tech:'#2f7c6e', shirt:'#dbe6f5',
@@ -56,19 +88,69 @@ const Scenes = (function(){
     // tie / accents for formal outfits
     let extras = '';
     if(outfit==='blazer' || outfit==='suit' || outfit==='prestige'){
-      // shirt V + tie
       extras += `<path d="M ${cx-14*s} ${torsoY} L ${cx} ${torsoY+26*s} L ${cx+14*s} ${torsoY}" fill="#eef3fb"/>`;
       extras += `<path d="M ${cx-5*s} ${torsoY+4*s} L ${cx+5*s} ${torsoY+4*s} L ${cx+3*s} ${torsoY+44*s} L ${cx} ${torsoY+52*s} L ${cx-3*s} ${torsoY+44*s} Z" fill="${accent}"/>`;
       if(outfit==='prestige'){
-        extras += `<rect x="${cx+22*s}" y="${torsoY+10*s}" width="${14*s}" height="${8*s}" rx="${2*s}" fill="${accent}"/>`; // pocket square
+        extras += `<rect x="${cx+22*s}" y="${torsoY+10*s}" width="${14*s}" height="${8*s}" rx="${2*s}" fill="${accent}"/>`;
       }
     } else if(outfit==='shirt'){
       extras += `<path d="M ${cx-12*s} ${torsoY} L ${cx} ${torsoY+18*s} L ${cx+12*s} ${torsoY}" fill="#c3d2ea"/>`;
     } else if(outfit==='tech'){
-      extras += `<circle cx="${cx}" cy="${torsoY+24*s}" r="${4*s}" fill="${accent}"/>`; // henley button accent
-    } else { // casual hoodie strings
+      extras += `<circle cx="${cx}" cy="${torsoY+24*s}" r="${4*s}" fill="${accent}"/>`;
+    } else {
       extras += `<line x1="${cx-6*s}" y1="${torsoY+4*s}" x2="${cx-6*s}" y2="${torsoY+24*s}" stroke="${accent}" stroke-width="${2.4*s}"/>`;
       extras += `<line x1="${cx+6*s}" y1="${torsoY+4*s}" x2="${cx+6*s}" y2="${torsoY+24*s}" stroke="${accent}" stroke-width="${2.4*s}"/>`;
+    }
+
+    // ---- hair (style-dependent) ----
+    function cap(dyUnits){           // filled circular segment over the top of the head
+      const dy = dyUnits*s, yy = headY + dy;
+      const dx = Math.sqrt(Math.max(0, headR*headR - dy*dy));
+      return `M ${cx-dx} ${yy} A ${headR} ${headR} 0 0 1 ${cx+dx} ${yy} Z`;
+    }
+    let hairSVG = '';
+    const style = L.hairStyle || 'short';
+    if(style==='bald'){
+      hairSVG = '';
+    } else if(style==='buzz'){
+      hairSVG = `<path d="${cap(-13)}" fill="${hair}" opacity="0.92"/>`;
+    } else if(style==='curly'){
+      const pts = [[-22,-16],[-11,-25],[2,-27],[15,-24],[24,-13],[-26,-4],[26,-5],[0,-19]];
+      pts.forEach(function(p){ hairSVG += `<circle cx="${cx+p[0]*s}" cy="${headY+p[1]*s}" r="${11*s}" fill="${hair}"/>`; });
+    } else if(style==='long'){
+      hairSVG += `<path d="M ${cx-headR+1*s} ${headY-4*s} Q ${cx-headR-7*s} ${headY+28*s} ${cx-headR} ${headY+64*s} L ${cx-headR+13*s} ${headY+64*s} Q ${cx-headR+9*s} ${headY+18*s} ${cx-headR+12*s} ${headY-4*s} Z" fill="${hair}"/>`;
+      hairSVG += `<path d="M ${cx+headR-1*s} ${headY-4*s} Q ${cx+headR+7*s} ${headY+28*s} ${cx+headR} ${headY+64*s} L ${cx+headR-13*s} ${headY+64*s} Q ${cx+headR-9*s} ${headY+18*s} ${cx+headR-12*s} ${headY-4*s} Z" fill="${hair}"/>`;
+      hairSVG += `<path d="${cap(3)}" fill="${hair}"/>`;
+    } else if(style==='bun'){
+      hairSVG += `<circle cx="${cx}" cy="${headY-headR-7*s}" r="${11*s}" fill="${hair}"/>`;
+      hairSVG += `<path d="${cap(-2)}" fill="${hair}"/>`;
+    } else { // short
+      hairSVG = `<path d="${cap(-1)}" fill="${hair}"/>`;
+    }
+
+    // ---- beard (drawn under the mouth) ----
+    let beardSVG = '';
+    if(L.beard){
+      const dy = 5*s, dx = Math.sqrt(Math.max(0, headR*headR - dy*dy));
+      beardSVG = `<path d="M ${cx-dx} ${headY+dy} A ${headR} ${headR} 0 0 0 ${cx+dx} ${headY+dy} Z" fill="${hair}" opacity="0.95"/>`;
+    }
+
+    // ---- glasses ----
+    let glassesSVG = '';
+    const ex = 12*s, ey = headY + 2*s, fr = '#1b2230';
+    if(L.glasses === 'round'){
+      glassesSVG = `<g fill="none" stroke="${fr}" stroke-width="${2.4*s}" stroke-linecap="round">` +
+        `<circle cx="${cx-ex}" cy="${ey}" r="${8*s}"/><circle cx="${cx+ex}" cy="${ey}" r="${8*s}"/>` +
+        `<line x1="${cx-ex+8*s}" y1="${ey}" x2="${cx+ex-8*s}" y2="${ey}"/>` +
+        `<line x1="${cx-ex-8*s}" y1="${ey-1*s}" x2="${cx-headR}" y2="${ey-3*s}"/>` +
+        `<line x1="${cx+ex+8*s}" y1="${ey-1*s}" x2="${cx+headR}" y2="${ey-3*s}"/></g>`;
+    } else if(L.glasses === 'square'){
+      glassesSVG = `<g fill="none" stroke="${fr}" stroke-width="${2.4*s}" stroke-linecap="round">` +
+        `<rect x="${cx-ex-8*s}" y="${ey-7*s}" width="${16*s}" height="${14*s}" rx="${3*s}"/>` +
+        `<rect x="${cx+ex-8*s}" y="${ey-7*s}" width="${16*s}" height="${14*s}" rx="${3*s}"/>` +
+        `<line x1="${cx-ex+8*s}" y1="${ey-2*s}" x2="${cx+ex-8*s}" y2="${ey-2*s}"/>` +
+        `<line x1="${cx-ex-8*s}" y1="${ey-3*s}" x2="${cx-headR}" y2="${ey-4*s}"/>` +
+        `<line x1="${cx+ex+8*s}" y1="${ey-3*s}" x2="${cx+headR}" y2="${ey-4*s}"/></g>`;
     }
 
     return `
@@ -85,19 +167,26 @@ const Scenes = (function(){
         <!-- ears -->
         <circle cx="${cx-headR}" cy="${headY+2*s}" r="${5*s}" fill="${skinShade}"/>
         <circle cx="${cx+headR}" cy="${headY+2*s}" r="${5*s}" fill="${skinShade}"/>
-        <!-- hair -->
-        <path d="M ${cx-headR-1*s} ${headY-2*s}
-                 Q ${cx-headR} ${headY-headR-6*s} ${cx} ${headY-headR-4*s}
-                 Q ${cx+headR} ${headY-headR-6*s} ${cx+headR+1*s} ${headY-2*s}
-                 Q ${cx+headR-4*s} ${headY-headR+6*s} ${cx} ${headY-headR+3*s}
-                 Q ${cx-headR+4*s} ${headY-headR+6*s} ${cx-headR-1*s} ${headY-2*s} Z"
-              fill="${hair}"/>
+        ${beardSVG}
+        ${hairSVG}
         <!-- eyes -->
         <circle cx="${cx-12*s}" cy="${headY+2*s}" r="${3.2*s}" fill="#27313f"/>
         <circle cx="${cx+12*s}" cy="${headY+2*s}" r="${3.2*s}" fill="#27313f"/>
         ${brow}
+        ${glassesSVG}
         ${mouth}
       </g>`;
+  }
+
+  /* Standalone bust for the character creator preview */
+  function avatarSVG(look){
+    const inner = avatar(120, 230, 1.15, 'casual', 'happy', look);
+    return `<svg viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">` +
+      `<defs><radialGradient id="pvbg" cx="50%" cy="32%" r="80%">` +
+      `<stop offset="0%" stop-color="#16243f"/><stop offset="100%" stop-color="#0b1020"/></radialGradient></defs>` +
+      `<rect width="240" height="240" rx="18" fill="url(#pvbg)"/>` +
+      `<ellipse cx="120" cy="232" rx="78" ry="16" fill="#0a0e1a" opacity="0.6"/>` +
+      inner + `</svg>`;
   }
 
   /* ---- shared bits ---- */
@@ -365,10 +454,10 @@ const Scenes = (function(){
     const pos = avatarPos[sceneId] || avatarPos.cubicle;
     const out = outfitFor(rank ? rank.band : 'entry');
     const mood = moodFor(state.perf);
-    const inner = build() + avatar(pos.x, pos.y, pos.s, out, mood);
+    const inner = build() + avatar(pos.x, pos.y, pos.s, out, mood, state.look);
     const svg = `<svg viewBox="0 0 ${VB_W} ${VB_H}" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
     return { svg, label: sceneLabel[sceneId] || '' };
   }
 
-  return { render };
+  return { render, avatarSVG, LOOKS, DEFAULT_LOOK, cloneLook, randomLook };
 })();

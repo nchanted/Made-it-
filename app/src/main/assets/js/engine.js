@@ -23,7 +23,7 @@
   /* ---------- the engine object ---------- */
   var MadeIt = {
     state: null,
-    ui: { route: 'title', prev: 'title', modal: null, selRole: null, pendingCompany: 0 },
+    ui: { route: 'title', prev: 'title', modal: null, selRole: null, pendingCompany: 0, look: null },
 
     /* ---- lifecycle ---- */
     init: function () {
@@ -36,7 +36,7 @@
       return !!(this.state && this.state.rank && !this.state.ended);
     },
 
-    newState: function (roleId, name, companyIndex) {
+    newState: function (roleId, name, companyIndex, look) {
       var rank = RANKS[roleId];
       var co = COMPANIES[companyIndex % COMPANIES.length];
       var entry = null;
@@ -46,6 +46,7 @@
         company: co[0],
         sector: co[1],
         track: entry ? entry.track : 'blue',
+        look: Scenes.cloneLook(look),
         rank: roleId,
         salary: rank.salary,
         perf: 60,
@@ -69,8 +70,8 @@
       };
     },
 
-    newGame: function (roleId, name, companyIndex) {
-      this.state = this.newState(roleId, name, companyIndex);
+    newGame: function (roleId, name, companyIndex, look) {
+      this.state = this.newState(roleId, name, companyIndex, look);
       this.award('first_day');
       this.checkMilestones();
       this.drawScenario();
@@ -365,7 +366,7 @@
       if (this.state && (this.state.phase === 'review' || this.state.phase === 'promotion' || this.state.phase === 'ending')) {
         return true;             // block back during blocking screens
       }
-      if (ui.route === 'role' || ui.route === 'name') { ui.route = 'title'; rerender(); return true; }
+      if (ui.route === 'role' || ui.route === 'customize' || ui.route === 'name') { ui.route = 'title'; rerender(); return true; }
       return false;              // title / game → let Android minimise the app
     }
   };

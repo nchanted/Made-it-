@@ -55,6 +55,9 @@ Then find it under the repo's **Releases**.
 
 - **Pick a starting role** — Blue Team (SOC), Red Team (pen testing) or Build
   (security engineering). They start you on the technical track.
+- **Create your character** — choose skin tone, hair style and colour, glasses
+  and facial hair (or hit "Surprise me"). Your avatar appears in every office
+  scene and its outfit upgrades as you climb.
 - **Each week = one decision.** The category of decision depends on your level:
   technical problems early on, then people management, then budgets, then
   executive/board-level dilemmas.

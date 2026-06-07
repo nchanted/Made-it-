@@ -40,6 +40,7 @@
       var route = MadeIt.ui.route;
       if (route === 'title') screenEl.innerHTML = this.title();
       else if (route === 'role') screenEl.innerHTML = this.rolePicker();
+      else if (route === 'customize') screenEl.innerHTML = this.customizer();
       else if (route === 'name') screenEl.innerHTML = this.nameScreen();
       else if (route === 'achievements') screenEl.innerHTML = this.achievements();
       else if (route === 'profile') screenEl.innerHTML = this.profile();
@@ -96,14 +97,66 @@
         '</div>';
     },
 
+    /* ---------------- character customizer ---------------- */
+    customizer: function () {
+      var look = MadeIt.ui.look || (MadeIt.ui.look = Scenes.cloneLook(Scenes.DEFAULT_LOOK));
+      var LK = Scenes.LOOKS;
+
+      var skinSw = LK.skins.map(function (pair, i) {
+        var on = look.skin[0] === pair[0] ? ' sel' : '';
+        return '<button class="sw' + on + '" data-skin="' + i + '" title="' + LK.skinNames[i] +
+               '" style="background:' + pair[0] + '"></button>';
+      }).join('');
+
+      var hairSw = LK.hairColors.map(function (c, i) {
+        var on = look.hair === c ? ' sel' : '';
+        return '<button class="sw' + on + '" data-haircolor="' + i + '" title="' + LK.hairColorNames[i] +
+               '" style="background:' + c + '"></button>';
+      }).join('');
+
+      var styleBtns = LK.hairStyles.map(function (st, i) {
+        var on = look.hairStyle === st ? ' sel' : '';
+        return '<button class="optbtn' + on + '" data-hairstyle="' + st + '">' + LK.hairStyleNames[i] + '</button>';
+      }).join('');
+
+      var glassBtns = LK.glasses.map(function (g, i) {
+        var on = look.glasses === g ? ' sel' : '';
+        return '<button class="optbtn' + on + '" data-glasses="' + g + '">' + LK.glassesNames[i] + '</button>';
+      }).join('');
+
+      var beardBtns =
+        '<button class="optbtn' + (!look.beard ? ' sel' : '') + '" data-beard="0">Clean</button>' +
+        '<button class="optbtn' + (look.beard ? ' sel' : '') + '" data-beard="1">Beard</button>';
+
+      return '' +
+        '<div class="deck-wrap col grow">' +
+          '<div class="sect">Create your character</div>' +
+          '<div class="grow scroll">' +
+            '<div class="preview">' + Scenes.avatarSVG(look) + '</div>' +
+            '<div class="optrow"><div class="sect">Skin</div><div class="swatches">' + skinSw + '</div></div>' +
+            '<div class="optrow"><div class="sect">Hair style</div><div class="optset">' + styleBtns + '</div></div>' +
+            '<div class="optrow"><div class="sect">Hair colour</div><div class="swatches">' + hairSw + '</div></div>' +
+            '<div class="optrow"><div class="sect">Glasses</div><div class="optset">' + glassBtns + '</div></div>' +
+            '<div class="optrow"><div class="sect">Facial hair</div><div class="optset">' + beardBtns + '</div></div>' +
+            '<button class="btn ghost mt12" data-act="randomize-look">\uD83C\uDFB2 Surprise me</button>' +
+          '</div>' +
+          '<div class="row gap8 mt12">' +
+            '<button class="btn ghost" style="width:auto" data-act="go-role">Back</button>' +
+            '<button class="btn grow" data-act="customize-next">Continue</button>' +
+          '</div>' +
+        '</div>';
+    },
+
     /* ---------------- name + employer ---------------- */
     nameScreen: function () {
       var co = COMPANIES[MadeIt.ui.pendingCompany % COMPANIES.length];
       var role = null, i;
       for (i = 0; i < ENTRY_ROLES.length; i++) if (ENTRY_ROLES[i].id === MadeIt.ui.selRole) role = ENTRY_ROLES[i];
+      var look = MadeIt.ui.look || Scenes.DEFAULT_LOOK;
       return '' +
         '<div class="deck-wrap col grow center" style="justify-content:center">' +
           '<div class="panel pad" style="width:min(460px,94vw)">' +
+            '<div class="preview" style="width:120px;margin:0 auto 8px">' + Scenes.avatarSVG(look) + '</div>' +
             '<div class="sect">Your offer letter</div>' +
             '<h2 style="margin:6px 0 2px">' + esc(co[0]) + '</h2>' +
             '<p class="soft" style="margin:0 0 4px">' + esc(co[1]) + ' is hiring you as a</p>' +
@@ -115,7 +168,7 @@
               'background:var(--panel-2);color:var(--ink);font-size:16px;font-family:var(--sans);' +
               '-webkit-user-select:text;user-select:text;" />' +
             '<div class="row gap8 mt16">' +
-              '<button class="btn ghost" style="width:auto" data-act="go-role">Back</button>' +
+              '<button class="btn ghost" style="width:auto" data-act="go-customize">Back</button>' +
               '<button class="btn grow gold" data-act="start-game">Sign &amp; Start</button>' +
             '</div>' +
           '</div>' +
@@ -379,8 +432,16 @@
 
     /* ---------------- click router ---------------- */
     onClick: function (e) {
-      var t = e.target.closest('[data-act],[data-role],[data-choice],[data-promote]');
+      var t = e.target.closest('[data-act],[data-role],[data-choice],[data-promote],[data-skin],[data-haircolor],[data-hairstyle],[data-glasses],[data-beard]');
       if (!t) return;
+
+      // ---- character customizer controls ----
+      var look = MadeIt.ui.look;
+      if (t.hasAttribute('data-skin')) { Sound.tap(); look.skin = Scenes.LOOKS.skins[+t.getAttribute('data-skin')].slice(); this.render(); return; }
+      if (t.hasAttribute('data-haircolor')) { Sound.tap(); look.hair = Scenes.LOOKS.hairColors[+t.getAttribute('data-haircolor')]; this.render(); return; }
+      if (t.hasAttribute('data-hairstyle')) { Sound.tap(); look.hairStyle = t.getAttribute('data-hairstyle'); this.render(); return; }
+      if (t.hasAttribute('data-glasses')) { Sound.tap(); look.glasses = t.getAttribute('data-glasses'); this.render(); return; }
+      if (t.hasAttribute('data-beard')) { Sound.tap(); look.beard = t.getAttribute('data-beard') === '1'; this.render(); return; }
 
       if (t.hasAttribute('data-role')) {
         Sound.select(); MadeIt.ui.selRole = t.getAttribute('data-role'); this.render(); return;
@@ -406,11 +467,17 @@
         case 'continue-game':
           Sound.tap(); this.show('game'); break;
         case 'role-next':
-          if (MadeIt.ui.selRole) { Sound.tap(); MadeIt.ui.pendingCompany = (Math.random() * COMPANIES.length) | 0; this._name = ''; this.show('name'); }
+          if (MadeIt.ui.selRole) { Sound.tap(); MadeIt.ui.look = Scenes.cloneLook(Scenes.DEFAULT_LOOK); this.show('customize'); }
           break;
+        case 'randomize-look':
+          Sound.select(); MadeIt.ui.look = Scenes.randomLook(); this.render(); break;
+        case 'go-customize':
+          Sound.tap(); this.show('customize'); break;
+        case 'customize-next':
+          Sound.tap(); MadeIt.ui.pendingCompany = (Math.random() * COMPANIES.length) | 0; this._name = ''; this.show('name'); break;
         case 'start-game':
           Sound.select();
-          MadeIt.newGame(MadeIt.ui.selRole, this._name || '', MadeIt.ui.pendingCompany);
+          MadeIt.newGame(MadeIt.ui.selRole, this._name || '', MadeIt.ui.pendingCompany, MadeIt.ui.look);
           break;
         case 'next-week': MadeIt.next(); break;
         case 'ack-review': MadeIt.ackReview(); break;
