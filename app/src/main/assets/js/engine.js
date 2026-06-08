@@ -56,7 +56,9 @@
         week: 1,
         weeksAtRank: 0,
         strikes: 0,
-        seen: {},               // { category: [ids] }
+        seen: {},               // legacy (unused)
+        seenAll: [],            // every scenario id shown this game (never repeated)
+        currentScenario: null,
         achievements: [],
         flags: { promoted: false, recoveredFinal: false },
         muted: Sound.isMuted(),
@@ -123,30 +125,83 @@
       return all;                                                               // last resort
     },
 
+    // True once every scenario the current rank can present has already been shown.
+    rankExhausted: function () {
+      var seen = this.state.seenAll || [], base = this.poolFor();
+      for (var i = 0; i < base.length; i++) { if (seen.indexOf(base[i].id) === -1) return false; }
+      return true;
+    },
+
     drawScenario: function () {
       var st = this.state, cat = this.category();
-      if (!st.seen[cat]) st.seen[cat] = [];
-      var base = this.poolFor();
-      var pool = base.filter(function (s) { return st.seen[cat].indexOf(s.id) === -1; });
-      if (!pool.length) {
-        // Pool exhausted. Reshuffle, but keep the most recently seen ones out of
-        // rotation so nothing reappears soon after it was shown.
-        var keep = Math.min(st.seen[cat].length, Math.max(3, Math.floor(base.length / 3)));
-        st.seen[cat] = st.seen[cat].slice(-keep);
-        pool = base.filter(function (s) { return st.seen[cat].indexOf(s.id) === -1; });
-        if (!pool.length) { st.seen[cat] = st.current ? [st.current] : []; pool = base.filter(function (s) { return s.id !== st.current; }); }
+      if (!st.seenAll) st.seenAll = [];
+      var seen = st.seenAll;
+      function unseen(s) { return seen.indexOf(s.id) === -1; }
+      var all = SCENARIOS.filter(function (s) { return s.cats.indexOf(cat) !== -1; });
+
+      // 1) role- and tier-appropriate, never-before-seen
+      var pool = this.poolFor().filter(unseen);
+      // 2) widen to the whole track (any tier), still never-seen
+      if (!pool.length && cat === 'technical') {
+        var track = st.track || 'build';
+        pool = all.filter(function (s) { return (s.track === 'any' || s.track === track) && unseen(s); });
       }
-      var s = pick(pool);
+      // 3) absolute backstop: every role-appropriate scenario has been seen, so use a
+      //    fresh "quiet week" interlude rather than ever repeating a real scenario.
+      var s = pool.length ? pick(pool) : this.makeFiller(cat);
+
       st.current = s.id;
-      st.seen[cat].push(s.id);
+      st.currentScenario = s;
+      if (seen.indexOf(s.id) === -1) seen.push(s.id);
       st.phase = 'play';
       st.outcome = null;
     },
 
+    fillerLines: {
+      technical: ['A rare quiet stretch: no fires in the queue, just the hum of the office and a stack of low-priority tickets.',
+                  'The alerts are calm and the systems are green. An unusually peaceful week to catch up.',
+                  'No incidents today. Just you, your tools, and a little breathing room for once.',
+                  'You finally clear the backlog and tidy your runbooks. Dull, but satisfying.',
+                  'A slow shift. You mentor a newer teammate and read up on the latest threats.'],
+      people: ['A calm week with the team. No crises, no conflicts -- just the steady work of keeping people moving.',
+               'Everyone is heads-down and content. A rare week with nothing on fire among your people.',
+               'The team is humming along. For once, no one needs you to put out a fire.',
+               'You spend the week on 1:1s and career chats. No drama, just steady tending.',
+               'A rare calm: you catch up on the admin and let the team get on with it.'],
+      budget: ['The numbers are balanced and nobody is asking for money today. A rare lull in the spreadsheets.',
+               'No urgent trade-offs this week. The budget is quiet and the vendors are silent.',
+               'A peaceful stretch with the finances in order and no fires to fund.',
+               'You tidy the forecasts and review contracts. Quiet, unglamorous, useful.',
+               'No fires this week -- just a chance to plan ahead and breathe.'],
+      executive: ['No board drama, no incidents, no regulators. An unusually quiet week at the top.',
+                  'The leadership calendar is light and nothing is on fire. A rare moment to think strategically.',
+                  'A calm week in the executive suite -- no crises demanding your attention.',
+                  'A quiet week up top. You take meetings, think long-term, and sign a few things.',
+                  'No fires at the top this week. You use the lull to plan the year ahead.']
+    },
+
+    makeFiller: function (cat) {
+      var st = this.state;
+      var lines = this.fillerLines[cat] || this.fillerLines.technical;
+      var focus = (RANKS[st.rank] && RANKS[st.rank].focus) || 'technical';
+      var sharpen = { stress: 1 }; sharpen[focus] = 2;
+      return {
+        id: 'quiet_' + st.week + '_' + ((Math.random() * 1e6) | 0),
+        cats: [cat], track: 'any', tier: 1, filler: true, type: 'Quiet Week',
+        title: 'A quieter week',
+        text: lines[(Math.random() * lines.length) | 0],
+        choices: [
+          { t: 'Use the slack to sharpen your skills.', fx: sharpen, res: 'You invest the downtime in getting a little sharper. Small gains compound.' },
+          { t: 'Catch your breath and recharge.', fx: { stress: -6, perf: 1 }, res: 'You step back and reset, returning steadier and a touch more effective.' }
+        ]
+      };
+    },
+
     scenario: function () {
-      var id = this.state.current, i;
-      for (i = 0; i < SCENARIOS.length; i++) if (SCENARIOS[i].id === id) return SCENARIOS[i];
-      return null;
+      var st = this.state;
+      if (st.currentScenario && st.currentScenario.id === st.current) return st.currentScenario;
+      for (var i = 0; i < SCENARIOS.length; i++) if (SCENARIOS[i].id === st.current) return SCENARIOS[i];
+      return st.currentScenario || null;
     },
 
     meetsReq: function (choice) {
@@ -314,9 +369,14 @@
       var st = this.state, r = RANKS[st.rank];
       if (!r || !r.req || !r.next || !r.next.length) return false;
       if (st.promoSnoozed) return false;
-      return st.weeksAtRank >= r.req.weeks &&
-             st.perf >= r.req.perf &&
-             (st.skills[r.req.skill] || 0) >= r.req.val;
+      var minTenure = Math.min(r.req.weeks, 4);
+      var timeMet = st.weeksAtRank >= minTenure && st.perf >= r.req.perf;
+      if (timeMet && (st.skills[r.req.skill] || 0) >= r.req.val) return true;
+      // Once you've handled every unique situation this role can present (and met
+      // the time/performance bar), you've earned the move up -- so you never have
+      // to replay a scenario just to keep progressing.
+      if (timeMet && this.rankExhausted()) return true;
+      return false;
     },
 
     promote: function (toId) {
